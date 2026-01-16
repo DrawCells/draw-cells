@@ -1,10 +1,11 @@
-import { Button } from "@mui/material";
+import { Button, Menu, MenuItem } from "@mui/material";
 import { useState } from "react";
 import { useSelector } from "react-redux";
 import State from "../../stateInterface";
 import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH } from "../../constants";
 import { Sprite } from "../../Frames/reducers/frames";
 import Konva from "konva";
+import ArrowDropDown from "@mui/icons-material/ArrowDropDown";
 
 async function uploadImage(file: File, presentationId: string) {
   // Step 1: get a presigned URL
@@ -40,8 +41,10 @@ export default function ExportVideo({
   presentationId: string;
 }) {
   const [isExporting, setIsExporting] = useState(false);
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
   const frames = useSelector((state: State) => state.frames.frames);
+  const currentFrame = useSelector((state: State) => state.frames.currentFrame);
 
   const createStage = () => {
     const container = document.createElement("div");
@@ -108,8 +111,9 @@ export default function ExportVideo({
     return blob;
   };
 
-  const handleExport = async () => {
+  const handleExportVideo = async () => {
     setIsExporting(true);
+    setAnchorEl(null);
     const stage = createStage();
     const files = [];
 
@@ -230,6 +234,21 @@ export default function ExportVideo({
             });
           }
         }
+
+        // Process sprites that are in nextFrame but not in current frame (fade in)
+        for (const sprite of nextFrame.sprites) {
+          const existingSprite = frame.sprites.find((s) => s.id === sprite.id);
+          if (!existingSprite) {
+            const newPosition = { x: sprite.position.x, y: sprite.position.y };
+            newSprites.push({
+              ...sprite,
+              id: `${sprite.id}-${i}`,
+              opacity: Math.min(i, 30) / 30,
+              position: newPosition,
+            });
+          }
+        }
+
         const newFrame: Blob = await renderSprites(stage, newSprites);
         const filename = `frame-${String(frameIdx).padStart(4, "0")}-${String(
           i
@@ -276,16 +295,58 @@ export default function ExportVideo({
     }
   };
 
+  const handleExportFrame = async () => {
+    setIsExporting(true);
+    setAnchorEl(null);
+    const stage = createStage();
+    const blob: Blob = await renderSprites(stage, currentFrame.sprites);
+
+    const fileUrl = URL.createObjectURL(blob);
+
+    // Create a temporary download link and click it
+    const link = document.createElement("a");
+    link.href = fileUrl;
+    link.download = "frame.png";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    // Optional: Revoke the object URL to free memory
+    URL.revokeObjectURL(fileUrl);
+    setIsExporting(false);
+  };
+
   return (
     <>
       <Button
         variant="contained"
         color="primary"
-        onClick={handleExport}
+        onClick={(e) => setAnchorEl(e.currentTarget)}
         disabled={isExporting}
+        endIcon={<ArrowDropDown />}
       >
-        {isExporting ? "Exporting..." : "Export Video"}
+        {isExporting ? "Exporting..." : "Export"}
       </Button>
+      <Menu
+        id="menu-export"
+        anchorEl={anchorEl}
+        anchorOrigin={{
+          vertical: "top",
+          horizontal: "right",
+        }}
+        keepMounted
+        transformOrigin={{
+          vertical: "top",
+          horizontal: "right",
+        }}
+        open={Boolean(anchorEl)}
+        onClose={() => setAnchorEl(null)}
+      >
+        <MenuItem onClick={handleExportVideo} disabled={isExporting}>
+          Export Video
+        </MenuItem>
+        <MenuItem onClick={handleExportFrame}>Export Frame as Image</MenuItem>
+      </Menu>
     </>
   );
 }
