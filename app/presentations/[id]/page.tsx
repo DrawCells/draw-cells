@@ -5,10 +5,10 @@ import dynamic from "next/dynamic";
 
 const AnimationCanvasContainer = dynamic(
   () => import("../../../src/Canvas/components/AnimationCanvas"),
-  { ssr: false }
+  { ssr: false },
 );
 
-const CanvasPage = async ({ params }: { params: { id: string } }) => {
+const CanvasPage = ({ params }: { params: { id: string } }) => {
   return <AnimationCanvasContainer />;
 };
 
