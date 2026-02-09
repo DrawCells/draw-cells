@@ -9,7 +9,6 @@ const CanvasSprite = React.forwardRef(
 
     React.useEffect(() => {
       const img = new window.Image();
-      console.log("Loading image for sprite:", shapeProps.backgroundUrl);
       img.src = `/assets/cells/${shapeProps.backgroundUrl}`;
       img.onload = () => setImage(img);
       img.onerror = (err) => console.error("Error loading image", err);
@@ -31,7 +30,7 @@ const CanvasSprite = React.forwardRef(
         />
       </React.Fragment>
     );
-  }
+  },
 );
 
 export default CanvasSprite;

@@ -67,30 +67,30 @@ function AnimationCanvas() {
   const dispatch = useDispatch();
 
   const sprites = useSelector(
-    (state: State) => state.frames.currentFrame.sprites
+    (state: State) => state.frames.currentFrame.sprites,
   );
   const selectedSprites = useSelector(
-    (state: State) => state.frames.currentSprites
+    (state: State) => state.frames.currentSprites,
   );
   const lastSpriteId = useSelector((state: State) => state.frames.lastSpriteId);
   const isSpritesSidebarOpen = useSelector(
-    (state: State) => state.sidebars.isSpritesOpen
+    (state: State) => state.sidebars.isSpritesOpen,
   );
   const scale = useSelector((state: State) => state.canvas.scale);
   const canvasContainer = useRef<any>(null);
   const dndContainerRef = useRef<any>(null);
 
   const currentFrameId = useSelector(
-    (state: State) => state.frames.currentFrame.id
+    (state: State) => state.frames.currentFrame.id,
   );
   const currentFrameBgUrl = useSelector(
-    (state: State) => state.frames.currentFrame.backgroundUrl
+    (state: State) => state.frames.currentFrame.backgroundUrl,
   );
   const framesList = useSelector((state: State) => state.frames.frames);
   const nextFrame = useSelector((state: State) => state.frames.nextFrame);
 
   const isAnimationPreviewModalOpen = useSelector(
-    (state: State) => state.presentations.isModalOpen
+    (state: State) => state.presentations.isModalOpen,
   );
 
   const theme = useTheme();
@@ -214,7 +214,7 @@ function AnimationCanvas() {
   function createSprite(
     pos: XYCoord | null,
     backgroundUrl: string,
-    ratio: number
+    ratio: number,
   ) {
     if (pos) {
       dispatch(
@@ -225,7 +225,7 @@ function AnimationCanvas() {
           height: 50 / ratio,
           width: 50,
           rotation: 0,
-        })
+        }),
       );
     }
   }
@@ -234,6 +234,7 @@ function AnimationCanvas() {
     accept: "SPRITE",
     drop: (item: any, monitor) => {
       if (item.type === "SIDEBAR_SPRITE") {
+        console.log("Dropped item:", item);
         const offsetX =
           (VIEWPORT_WIDTH / 2 + OFFSET + leftDrawerWidth - 30) * (1 / scale);
         const offsetY =
@@ -250,7 +251,7 @@ function AnimationCanvas() {
               scrollContainerRef.current.scrollTop,
           },
           item.backgroundUrl,
-          item.ratio
+          item.ratio,
         );
       }
     },
@@ -278,7 +279,7 @@ function AnimationCanvas() {
           }
         }
       },
-      { passive: false }
+      { passive: false },
     );
   }, [dispatch, prevDelta]);
 
@@ -298,7 +299,7 @@ function AnimationCanvas() {
     if (selectedSprites.length > 0) {
       // we need to attach transformer manually
       trRef.current.nodes(
-        selectedSprites.map((s) => shapeRefs.current[s.id].current)
+        selectedSprites.map((s) => shapeRefs.current[s.id].current),
       );
       trRef.current.getLayer().batchDraw();
     }
@@ -353,31 +354,31 @@ function AnimationCanvas() {
       n.scaleY(1);
 
       dispatch(
-        updateSprite({ field: "positionX", value: n.x(), ...commonDetails })
+        updateSprite({ field: "positionX", value: n.x(), ...commonDetails }),
       );
       dispatch(
-        updateSprite({ field: "positionY", value: n.y(), ...commonDetails })
+        updateSprite({ field: "positionY", value: n.y(), ...commonDetails }),
       );
       dispatch(
         updateSprite({
           field: "width",
           value: Math.max(5, n.width() * scaleX),
           ...commonDetails,
-        })
+        }),
       );
       dispatch(
         updateSprite({
           field: "height",
           value: Math.max(5, n.height() * scaleY),
           ...commonDetails,
-        })
+        }),
       );
       dispatch(
         updateSprite({
           field: "rotation",
           value: n.rotation(),
           ...commonDetails,
-        })
+        }),
       );
     }
   };
@@ -387,10 +388,10 @@ function AnimationCanvas() {
     for (let n of e.target.nodes()) {
       const commonDetails = { id: n.attrs.spriteId };
       dispatch(
-        updateSprite({ field: "positionX", value: n.x(), ...commonDetails })
+        updateSprite({ field: "positionX", value: n.x(), ...commonDetails }),
       );
       dispatch(
-        updateSprite({ field: "positionY", value: n.y(), ...commonDetails })
+        updateSprite({ field: "positionY", value: n.y(), ...commonDetails }),
       );
     }
   };
@@ -479,10 +480,10 @@ function AnimationCanvas() {
                     {sprites?.map((s: Sprite) => {
                       shapeRefs.current[s.id] = React.createRef();
                       const nextFrameSprite = nextFrame?.sprites.find(
-                        (s2) => s2.id.toString() === s.id.toString()
+                        (s2) => s2.id.toString() === s.id.toString(),
                       );
                       const isSelected = selectedSprites.find(
-                        (s2) => s2.id.toString() === s.id.toString()
+                        (s2) => s2.id.toString() === s.id.toString(),
                       );
                       return (
                         <React.Fragment key={s.id}>

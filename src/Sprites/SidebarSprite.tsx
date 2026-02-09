@@ -2,33 +2,34 @@ import { Box, Typography } from "@mui/material";
 import React, { useEffect, useState } from "react";
 import { useDrag } from "react-dnd";
 import { getEmptyImage } from "react-dnd-html5-backend";
-import InlineSvg from "./SvgInline";
 
 interface SidebarSpriteProps {
   backgroundUrl: string;
   name: string;
+  onDragStart?: () => void;
 }
 
 export default function SidebarSprite({
   backgroundUrl,
   name,
+  onDragStart,
 }: SidebarSpriteProps) {
   const [ratio, setRatio] = useState(1);
-
+  const hasStartedDraggingRef = React.useRef(false);
   const [{ isDragging: isSquareDragging }, squareDrag, preview] = useDrag(
     () => ({
       type: "SPRITE",
       item: {
         type: "SIDEBAR_SPRITE",
         backgroundUrl,
-        ratio: ratio,
+        ratio,
         name,
       },
       collect: (monitor) => ({
         isDragging: !!monitor.isDragging(),
       }),
     }),
-    [ratio]
+    [ratio],
   );
 
   useEffect(() => {
@@ -36,11 +37,18 @@ export default function SidebarSprite({
   }, [preview]);
 
   useEffect(() => {
-    const sidebarSvg = document.getElementById(backgroundUrl);
-    const result = sidebarSvg?.getAttribute("viewBox")?.split(" ");
-    if (result && result[2] && result[3]) {
-      setRatio(parseInt(result[2]) / parseInt(result[3]));
+    if (isSquareDragging && !hasStartedDraggingRef.current) {
+      hasStartedDraggingRef.current = true;
+      onDragStart?.();
     }
+
+    if (!isSquareDragging && hasStartedDraggingRef.current) {
+      hasStartedDraggingRef.current = false;
+    }
+  }, [isSquareDragging, onDragStart]);
+
+  useEffect(() => {
+    setRatio(1);
   }, [backgroundUrl]);
 
   return (
@@ -54,7 +62,7 @@ export default function SidebarSprite({
     >
       <Box
         ref={squareDrag as any}
-        sx={{ width: 50, height: 50, cursor: "pointer" }}
+        sx={{ width: 50, height: 50, cursor: "grab" }}
         style={{ opacity: isSquareDragging ? 0.5 : 1 }}
       >
         {backgroundUrl && (
@@ -62,7 +70,13 @@ export default function SidebarSprite({
             src={`/assets/cells/${backgroundUrl}`}
             alt={name}
             width={50}
-            height={50 / ratio}
+            height={50}
+            onLoad={(event) => {
+              const { naturalWidth, naturalHeight } = event.currentTarget;
+              if (naturalWidth > 0 && naturalHeight > 0) {
+                setRatio(naturalWidth / naturalHeight);
+              }
+            }}
           />
         )}
       </Box>

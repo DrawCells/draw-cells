@@ -1,7 +1,7 @@
 import { Accordion, AccordionSummary, Box, TextField } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { SPRITE_TO_SVG_ELEMENT_MAP } from "../../constants";
-import SidebarSprite from "../../Sprites/SidebarSprite";
+import SidebarSpriteWithVariants from "../../Sprites/SidebarSpriteWithVariants";
 import { useMemo, useState } from "react";
 
 export default function SpritesSection() {
@@ -13,8 +13,8 @@ export default function SpritesSection() {
         ([key, sprite]) =>
           sprite.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           sprite.tags.some((tag) =>
-            tag.toLowerCase().includes(searchTerm.toLowerCase())
-          )
+            tag.toLowerCase().includes(searchTerm.toLowerCase()),
+          ),
       )
       .map(([key, sprite]) => key as keyof typeof SPRITE_TO_SVG_ELEMENT_MAP);
   }, [searchTerm]);
@@ -71,12 +71,11 @@ export default function SpritesSection() {
           {filteredSprites.map((s, i) => {
             const sprite = SPRITE_TO_SVG_ELEMENT_MAP[s];
             return (
-              <SidebarSprite
+              <SidebarSpriteWithVariants
                 key={`sprite-${i}`}
-                backgroundUrl={`${sprite.category}/${sprite.name}${
-                  sprite.variants ? ` - ${sprite.variants[0]}` : ""
-                }.svg`}
                 name={sprite.name}
+                category={sprite.category}
+                variants={sprite.variants}
               />
             );
           })}

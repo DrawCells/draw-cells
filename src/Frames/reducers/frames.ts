@@ -69,7 +69,7 @@ export interface FramesState {
 
 const computeNextFrame = (
   frames: Array<Frame>,
-  crtFrame: Frame
+  crtFrame: Frame,
 ): Frame | null => {
   const crtFrameIndex = frames.map((f) => f.id).indexOf(crtFrame.id);
   const nextFrame =
@@ -80,7 +80,7 @@ const computeNextFrame = (
 const computeSpritePosition = (
   sprite: Sprite,
   deltaX: number | undefined,
-  deltaY: number | undefined
+  deltaY: number | undefined,
 ): Sprite => {
   const newX = (sprite?.position.x || 0) + (deltaX || 0);
   const newY = (sprite?.position.y || 0) + (deltaY || 0);
@@ -102,7 +102,7 @@ const computeLinearAnimation = (currentSprite: Sprite, prevSprite: Sprite) => {
 const computeChaoticAnimation = (
   currentSprite: Sprite,
   prevSprite: Sprite,
-  reversed: boolean = false
+  reversed: boolean = false,
 ) => {
   if (!prevSprite)
     return { to: { x: currentSprite.position.x, y: currentSprite.position.y } };
@@ -131,10 +131,10 @@ const computeChaoticAnimation = (
     chaoticArray.push({ x: newLeft, y: newTop });
     let newRandLeft;
     const fromIntermediaryLeftPoint = Math.round(
-      (prevSprite?.position.x || 0) + leftStep * i
+      (prevSprite?.position.x || 0) + leftStep * i,
     );
     const toIntermediaryLeftPoint = Math.round(
-      (prevSprite?.position.x || 0) + leftStep * (i + 1)
+      (prevSprite?.position.x || 0) + leftStep * (i + 1),
     );
     const fromLeft = fromIntermediaryLeftPoint - rangeOfMotion * leftDirection;
     const toLeft = toIntermediaryLeftPoint + rangeOfMotion * leftDirection;
@@ -146,10 +146,10 @@ const computeChaoticAnimation = (
 
     let newRandTop;
     const fromIntermediaryTopPoint = Math.round(
-      (prevSprite?.position.y || 0) + topStep * i
+      (prevSprite?.position.y || 0) + topStep * i,
     );
     const toIntermediaryTopPoint = Math.round(
-      (prevSprite?.position.y || 0) + topStep * (i + 1)
+      (prevSprite?.position.y || 0) + topStep * (i + 1),
     );
     const fromTop = fromIntermediaryTopPoint - rangeOfMotion * topDirection;
     const toTop = toIntermediaryTopPoint + rangeOfMotion * topDirection;
@@ -169,7 +169,7 @@ const computeChaoticAnimation = (
 const computeCircularAnimation = (
   currentSprite: Sprite,
   prevSprite: Sprite,
-  reversed: boolean = false
+  reversed: boolean = false,
 ) => {
   const circleDirection: number =
     (reversed ? currentSprite.circleDirection : prevSprite?.circleDirection) ||
@@ -188,7 +188,7 @@ const computeCircularAnimation = (
   const radius =
     Math.round(
       (pointsDistance / 2 / Math.sin((currentAngle / 2) * (Math.PI / 180))) *
-        100
+        100,
     ) / 100;
 
   if (x1 === x2 && y1 === y2) {
@@ -231,7 +231,7 @@ const computeCircularAnimation = (
         y3 * y3 -
         2 * m * x3 * y3 -
         radius * radius) *
-        100
+        100,
     ) / 100;
   const delta = Math.round((b * b - 4 * a * c) * 100) / 100;
 
@@ -253,7 +253,7 @@ const computeCircularAnimation = (
   }
 
   const circleX = Math.round(
-    (-b + currentCircleDirection * Math.sqrt(delta)) / (2 * a)
+    (-b + currentCircleDirection * Math.sqrt(delta)) / (2 * a),
   );
   const circleY = Math.round(m * circleX - m * x3 + y3);
 
@@ -279,7 +279,7 @@ const computeCircularAnimation = (
 const getAnimationProps = (
   currentSprite: Sprite,
   prevSprite: Sprite,
-  reversed: boolean = false
+  reversed: boolean = false,
 ) => {
   if (!currentSprite) return {};
   if (!prevSprite) return computeLinearAnimation(currentSprite, prevSprite);
@@ -301,7 +301,7 @@ const getAnimationProps = (
 
 const computeNewFrames = (
   frames: Array<Frame>,
-  crtFrame: Frame
+  crtFrame: Frame,
 ): Array<Frame> => {
   const crtFrameIndex = frames.map((f) => f.id).indexOf(crtFrame.id);
   const prevFrame = crtFrameIndex - 1 >= 0 ? frames[crtFrameIndex - 1] : null;
@@ -328,7 +328,7 @@ const computeNewFrames = (
         crtFrameSprites[s.id].reverseAnimationProps = getAnimationProps(
           s,
           crtFrameSprites[s.id],
-          true
+          true,
         );
       }
     }
@@ -339,7 +339,7 @@ const computeNewFrames = (
       nextFrameSprites[s.id].reverseAnimationProps = getAnimationProps(
         s,
         nextFrameSprites[s.id],
-        true
+        true,
       );
     }
   }
@@ -362,7 +362,7 @@ const computeNewFrames = (
 
 export const frames = (
   state: FramesState = initialState,
-  action: Action
+  action: Action,
 ): FramesState => {
   const { type, payload } = action;
   switch (type) {
@@ -377,7 +377,7 @@ export const frames = (
         ...payload.frames.map((f: Frame) => {
           if (!f.sprites) return 1;
           return Math.max(...f.sprites.map((s) => parseInt(s.id.toString())));
-        })
+        }),
       );
 
       const nextFrame = computeNextFrame(payload.frames, payload.frames[0]);
@@ -395,6 +395,7 @@ export const frames = (
       };
     }
     case Actions.ADD_SPRITE: {
+      console.log("Adding sprite with payload:", payload);
       const newSprite = {
         duration: 1,
         minTravelDistance: 15,
@@ -406,8 +407,8 @@ export const frames = (
         angle: 90,
         opacity: 1,
         zIndex: 1,
-        width: 50,
-        height: 50,
+        width: payload.width || 50,
+        height: payload.height || 50,
         ...payload,
       };
       const crtFrame = {
@@ -416,7 +417,7 @@ export const frames = (
       };
       const newFrames = computeNewFrames(
         structuredClone(state.frames),
-        crtFrame
+        crtFrame,
       );
       return {
         ...state,
@@ -478,7 +479,7 @@ export const frames = (
     }
     case Actions.UPDATE_SPRITE: {
       const currentSprite = state.currentSprites.find(
-        (s) => s.id.toString() === payload.id.toString()
+        (s) => s.id.toString() === payload.id.toString(),
       );
       if (!currentSprite) return state;
 
@@ -507,17 +508,17 @@ export const frames = (
       }
 
       const newCurrentSprites = state.currentSprites.map((s) =>
-        s.id === payload.id ? newCurrentSprite : s
+        s.id === payload.id ? newCurrentSprite : s,
       );
       const crtFrame = {
         ...state.currentFrame,
         sprites: state.currentFrame.sprites.map((s) =>
-          s.id === payload.id ? newCurrentSprite : s
+          s.id === payload.id ? newCurrentSprite : s,
         ),
       };
       const newFrames = computeNewFrames(
         structuredClone(state.frames),
-        structuredClone(crtFrame)
+        structuredClone(crtFrame),
       );
       return {
         ...state,
@@ -531,7 +532,7 @@ export const frames = (
       const crtFrame = {
         ...state.currentFrame,
         sprites: state.currentFrame.sprites.filter(
-          (s) => currentSpritesIds.indexOf(s.id) < 0
+          (s) => currentSpritesIds.indexOf(s.id) < 0,
         ),
       };
       const newFrames = computeNewFrames(state.frames, crtFrame);
@@ -547,7 +548,7 @@ export const frames = (
       const crtFrame = {
         ...state.currentFrame,
         sprites: state.currentFrame.sprites.filter(
-          (s) => currentSpritesIds.indexOf(s.id) < 0
+          (s) => currentSpritesIds.indexOf(s.id) < 0,
         ),
       };
       const newFrames = state.frames.map((f) => ({
@@ -563,13 +564,13 @@ export const frames = (
     }
     case Actions.COPY_SPRITE_INTO_FRAME: {
       const spriteToCopy = state.currentFrame.sprites.find(
-        (s) => s.id === payload.spriteId
+        (s) => s.id === payload.spriteId,
       );
       if (spriteToCopy) {
         const newFrames = state.frames.map((f) =>
           f.id === payload.frameId
             ? { ...f, sprites: [...f.sprites, spriteToCopy] }
-            : f
+            : f,
         );
         return {
           ...state,
@@ -581,13 +582,13 @@ export const frames = (
     case Actions.COPY_SELECTED_SPRITES_INTO_FRAME: {
       const currentSpritesIds = state.currentSprites.map((x) => x.id);
       const spritesToCopy = state.currentFrame.sprites.filter(
-        (s) => currentSpritesIds.indexOf(s.id) > -1
+        (s) => currentSpritesIds.indexOf(s.id) > -1,
       );
       if (spritesToCopy) {
         const newFrames = state.frames.map((f) =>
           f.id === payload.frameId
             ? { ...f, sprites: [...f.sprites, ...spritesToCopy] }
-            : f
+            : f,
         );
         return {
           ...state,
@@ -599,13 +600,13 @@ export const frames = (
     case Actions.ADD_FRAME: {
       const newFrames = computeNewFrames(
         [...structuredClone(state.frames), payload],
-        payload
+        payload,
       );
       const crtFrame =
         state.frames.find((f) => f.id === payload) || initialState.frames[0];
       const nextFrame = computeNextFrame(
         structuredClone(state.frames),
-        structuredClone(crtFrame)
+        structuredClone(crtFrame),
       );
 
       return {
@@ -647,7 +648,7 @@ export const frames = (
         state.frames.find((f) => f.id === payload) || initialState.frames[0];
       const newCurrentSprites =
         crtFrame.sprites.filter((s) =>
-          state.currentSprites.find((crtSprite) => crtSprite.id === s.id)
+          state.currentSprites.find((crtSprite) => crtSprite.id === s.id),
         ) || [];
 
       const nextFrame = computeNextFrame(state.frames, crtFrame);
@@ -671,7 +672,7 @@ export const frames = (
     }
     case Actions.SET_CURRENT_SPRITE: {
       const crtSprite = state.currentFrame.sprites.find(
-        (s) => s.id === payload
+        (s) => s.id === payload,
       );
       const shouldRemove = !!state.currentSprites.find((s) => s.id === payload);
       return {
@@ -681,7 +682,7 @@ export const frames = (
     }
     case Actions.ADD_CURRENT_SPRITE: {
       const crtSprite = state.currentFrame.sprites.find(
-        (s) => s.id === payload
+        (s) => s.id === payload,
       );
       const shouldRemove = !!state.currentSprites.find((s) => s.id === payload);
       return {
@@ -711,7 +712,7 @@ export const frames = (
           const newCurrentSprite: Sprite = computeSpritePosition(
             crtSprite,
             deltaX,
-            deltaY
+            deltaY,
           );
           newCurrentSpritesById.set(crtSprite.id, newCurrentSprite);
         }
@@ -745,12 +746,12 @@ export const frames = (
         const newCurrentSprite = computeSpritePosition(
           crtSprite,
           deltaX,
-          deltaY
+          deltaY,
         );
         const newCurrentFrame = {
           ...state.currentFrame,
           sprites: state.currentFrame.sprites.map((s) =>
-            s.id === id ? newCurrentSprite : s
+            s.id === id ? newCurrentSprite : s,
           ),
         };
         const newFrames = computeNewFrames(state.frames, newCurrentFrame);
@@ -759,7 +760,7 @@ export const frames = (
           frames: newFrames,
           currentFrame: newCurrentFrame,
           currentSprites: state.currentSprites.map((s) =>
-            s.id === id ? newCurrentSprite : s
+            s.id === id ? newCurrentSprite : s,
           ),
         };
       }
@@ -767,13 +768,13 @@ export const frames = (
     case Actions.NEXT_FRAME: {
       let newCrtFrame = state.currentFrame;
       const crtFrameIndex = state.frames.findIndex(
-        (f) => f.id === state.currentFrame.id
+        (f) => f.id === state.currentFrame.id,
       );
       if (crtFrameIndex < state.frames.length - 1)
         newCrtFrame = state.frames[crtFrameIndex + 1];
       const newCurrentSprites =
         newCrtFrame.sprites.filter((s) =>
-          state.currentSprites.find((crtSprite) => crtSprite.id === s.id)
+          state.currentSprites.find((crtSprite) => crtSprite.id === s.id),
         ) || [];
       return {
         ...state,
@@ -785,12 +786,12 @@ export const frames = (
     case Actions.PREV_FRAME: {
       let newCrtFrame = state.currentFrame;
       const crtFrameIndex = state.frames.findIndex(
-        (f) => f.id === state.currentFrame.id
+        (f) => f.id === state.currentFrame.id,
       );
       if (crtFrameIndex > 0) newCrtFrame = state.frames[crtFrameIndex - 1];
       const newCurrentSprites =
         newCrtFrame.sprites.filter((s) =>
-          state.currentSprites.find((crtSprite) => crtSprite.id === s.id)
+          state.currentSprites.find((crtSprite) => crtSprite.id === s.id),
         ) || [];
       return {
         ...state,
@@ -819,7 +820,7 @@ export const frames = (
     }
     case Actions.SET_FRAME_PREVIEW: {
       const newFrames = state.frames.map((x) =>
-        x.id === payload.frameId ? { ...x, preview: payload.preview } : x
+        x.id === payload.frameId ? { ...x, preview: payload.preview } : x,
       );
       return {
         ...state,
@@ -856,7 +857,7 @@ export const frames = (
     }
     case Actions.SET_CURRENT_FRAME_BACKGROUND: {
       const newFrames = state.frames.map((x) =>
-        x.id === state.currentFrame.id ? { ...x, backgroundUrl: payload } : x
+        x.id === state.currentFrame.id ? { ...x, backgroundUrl: payload } : x,
       );
       return {
         ...state,
