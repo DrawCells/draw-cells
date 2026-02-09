@@ -6,8 +6,9 @@ export async function POST(req: NextRequest) {
 
   try {
     const expiresIn = 60 * 60 * 24 * 5 * 1000; // 5 days
+    const response = NextResponse.json({ success: true });
 
-    cookies().set("userId", userId, {
+    response.cookies.set("userId", userId, {
       httpOnly: true,
       maxAge: expiresIn / 1000,
       path: "/",
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
       sameSite: "lax",
     });
 
-    return NextResponse.json({ success: true });
+    return response;
   } catch (error) {
     console.error("Token verification failed", error);
     return NextResponse.json({ error: "Invalid token" }, { status: 401 });

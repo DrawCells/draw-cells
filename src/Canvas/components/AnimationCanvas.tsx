@@ -99,7 +99,7 @@ function AnimationCanvas() {
 
   const { id: presentationId } = useParams();
 
-  const viewportRef: any = React.useRef();
+  const viewportRef: any = useRef(null);
 
   // LOADING FROM DB
   const [isLoading, setIsLoading] = useState(false);
@@ -292,8 +292,8 @@ function AnimationCanvas() {
     }
   };
 
-  const trRef: any = React.useRef();
-  const shapeRefs: any = React.useRef({});
+  const trRef: any = useRef(null);
+  const shapeRefs: any = useRef({});
 
   useEffect(() => {
     if (selectedSprites.length > 0) {
@@ -306,7 +306,7 @@ function AnimationCanvas() {
   }, [selectedSprites]);
 
   // CANVAS SCROLLING
-  const scrollContainerRef: any = React.useRef();
+  const scrollContainerRef: any = useRef(null);
   const [stagePosition, setStagePosition] = useState({ x: 0, y: 0 });
   useEffect(() => {
     function repositionStage() {
@@ -320,7 +320,7 @@ function AnimationCanvas() {
   }, []);
 
   // CONTEXT MENU
-  const stageRef: any = React.useRef();
+  const stageRef: any = useRef(null);
   const [menuState, setMenuState] = useState(initialMenuState);
   const handleContextMenu = (e: any) => {
     // prevent default behavior
