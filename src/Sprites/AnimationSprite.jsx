@@ -114,18 +114,18 @@ export default function AnimationSprite(props) {
         .to([prevFrameId, crtFrameId], [angleDirection * finalAngle, 0])
         .to((x) => x),
     ],
-    (x) => x
+    (x) => x,
   );
   const svgRotationProps = to(
     [
       rotateSpring
         .to(
           [prevFrameId, crtFrameId],
-          [prevSprite?.rotation - angleDirection * finalAngle, rotation]
+          [prevSprite?.rotation - angleDirection * finalAngle, rotation],
         )
         .to((x) => x),
     ],
-    (x) => x
+    (x) => x,
   );
 
   // CHOOSE THE PROPS
@@ -164,7 +164,7 @@ export default function AnimationSprite(props) {
     const newImg = new window.Image();
     newImg.src = `/assets/cells/${backgroundUrl}`;
     newImg.onload = () => setImg(newImg);
-  });
+  }, [backgroundUrl]);
 
   return (
     <animated.Group width={width} height={height} {...animationProps}>
