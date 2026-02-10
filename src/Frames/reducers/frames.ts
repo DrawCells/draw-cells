@@ -302,7 +302,8 @@ const getAnimationProps = (
 const computeNewFrames = (
   frames: Array<Frame>,
   crtFrame: Frame,
-): Array<Frame> => {
+): { frames: Array<Frame>; currentFrame: Frame } => {
+  const crtFrameClone = structuredClone(crtFrame);
   const crtFrameIndex = frames.map((f) => f.id).indexOf(crtFrame.id);
   const prevFrame =
     crtFrameIndex - 1 >= 0 ? structuredClone(frames[crtFrameIndex - 1]) : null;
@@ -311,7 +312,7 @@ const computeNewFrames = (
       ? structuredClone(frames[crtFrameIndex + 1])
       : null;
 
-  const crtFrameSprites = crtFrame.sprites.reduce((r: any, s) => {
+  const crtFrameSprites = crtFrameClone.sprites.reduce((r: any, s) => {
     if (!s || !s.id) return r;
     r[s.id] = structuredClone(s);
     return r;
@@ -343,7 +344,7 @@ const computeNewFrames = (
     }
   }
 
-  for (let s of crtFrame.sprites) {
+  for (let s of crtFrameClone.sprites) {
     s.animationProps = getAnimationProps(nextFrameSprites[s.id], s);
     if (nextFrame && nextFrameSprites[s.id]) {
       nextFrameSprites[s.id].reverseAnimationProps = getAnimationProps(
@@ -355,10 +356,10 @@ const computeNewFrames = (
   }
 
   const newFrames = frames
-    .map((f) => (f.id === crtFrame.id ? crtFrame : f))
+    .map((f) => (f.id === crtFrameClone.id ? crtFrameClone : f))
     .map((f) => (newPrevFrame && f.id === newPrevFrame.id ? newPrevFrame : f));
 
-  return newFrames;
+  return { frames: newFrames, currentFrame: crtFrameClone };
 };
 
 // Possibly need in the future for Copy/Remove from all frames
@@ -425,14 +426,12 @@ export const frames = (
         ...state.currentFrame,
         sprites: [...structuredClone(state.currentFrame.sprites), newSprite],
       };
-      const newFrames = computeNewFrames(
-        structuredClone(state.frames),
-        crtFrame,
-      );
+      const { frames: newFrames, currentFrame: newCurrentFrame } =
+        computeNewFrames(structuredClone(state.frames), crtFrame);
       return {
         ...state,
         frames: newFrames,
-        currentFrame: crtFrame,
+        currentFrame: newCurrentFrame,
         lastSpriteId: state.lastSpriteId + 1,
       };
     }
@@ -479,12 +478,13 @@ export const frames = (
           return newS;
         }),
       };
-      const newFrames = computeNewFrames(state.frames, crtFrame);
+      const { frames: newFrames, currentFrame: newCurrentFrame } =
+        computeNewFrames(state.frames, crtFrame);
       console.log({ newFrames });
       return {
         ...state,
         frames: newFrames,
-        currentFrame: crtFrame,
+        currentFrame: newCurrentFrame,
         currentSprites: newCurrentSprites,
       };
     }
@@ -527,11 +527,12 @@ export const frames = (
           s.id === payload.id ? newCurrentSprite : structuredClone(s),
         ),
       };
-      const newFrames = computeNewFrames(state.frames, crtFrame);
+      const { frames: newFrames, currentFrame: newCurrentFrame } =
+        computeNewFrames(state.frames, crtFrame);
       return {
         ...state,
         frames: newFrames,
-        currentFrame: crtFrame,
+        currentFrame: newCurrentFrame,
         currentSprites: newCurrentSprites,
       };
     }
@@ -543,11 +544,12 @@ export const frames = (
           (s) => currentSpritesIds.indexOf(s.id) < 0,
         ),
       };
-      const newFrames = computeNewFrames(state.frames, crtFrame);
+      const { frames: newFrames, currentFrame: newCurrentFrame } =
+        computeNewFrames(state.frames, crtFrame);
       return {
         ...state,
         frames: newFrames,
-        currentFrame: crtFrame,
+        currentFrame: newCurrentFrame,
         currentSprites: [],
       };
     }
@@ -606,14 +608,15 @@ export const frames = (
       return { ...state };
     }
     case Actions.ADD_FRAME: {
-      const newFrames = computeNewFrames([...state.frames, payload], payload);
+      const { frames: newFrames, currentFrame: newCurrentFrame } =
+        computeNewFrames([...state.frames, payload], payload);
       const crtFrame =
         state.frames.find((f) => f.id === payload) || initialState.frames[0];
       const nextFrame = computeNextFrame(state.frames, crtFrame);
 
       return {
         ...state,
-        currentFrame: payload,
+        currentFrame: newCurrentFrame,
         nextFrame: nextFrame,
         frames: newFrames,
       };
@@ -665,7 +668,7 @@ export const frames = (
     case Actions.RECOMPUTE_FRAMES: {
       let frames = state.frames;
       for (let f of frames) {
-        frames = computeNewFrames(frames, f);
+        frames = computeNewFrames(frames, f).frames;
       }
       return {
         ...state,
@@ -728,11 +731,12 @@ export const frames = (
             return s;
           }),
         };
-        const newFrames = computeNewFrames(state.frames, newCurrentFrame);
+        const { frames: newFrames, currentFrame: newCurrentFrameClone } =
+          computeNewFrames(state.frames, newCurrentFrame);
         return {
           ...state,
           frames: newFrames,
-          currentFrame: newCurrentFrame,
+          currentFrame: newCurrentFrameClone,
           currentSprites: state.currentSprites.map((s) => {
             let newS = null;
             if (s.id && newCurrentSpritesById.get(s.id))
@@ -756,11 +760,12 @@ export const frames = (
             s.id === id ? newCurrentSprite : s,
           ),
         };
-        const newFrames = computeNewFrames(state.frames, newCurrentFrame);
+        const { frames: newFrames, currentFrame: newCurrentFrameClone } =
+          computeNewFrames(state.frames, newCurrentFrame);
         return {
           ...state,
           frames: newFrames,
-          currentFrame: newCurrentFrame,
+          currentFrame: newCurrentFrameClone,
           currentSprites: state.currentSprites.map((s) =>
             s.id === id ? newCurrentSprite : s,
           ),
