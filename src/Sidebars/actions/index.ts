@@ -3,6 +3,7 @@ export const Actions = {
   TOGGLE_FRAMES: "TOGGLE_FRAMES",
   TOGGLE_PROPERTIES: "TOGGLE_PROPERTIES",
   LOAD_BACKGROUNDS: "LOAD_BACKGROUNDS",
+  LOAD_SPRITES: "LOAD_SPRITES",
 };
 
 export const toggleSprites = () => ({
@@ -22,5 +23,13 @@ export const loadBackgrounds = (payload: {
   hasEnded?: boolean;
 }) => ({
   type: Actions.LOAD_BACKGROUNDS,
+  payload,
+});
+
+export const loadSprites = (payload: {
+  sprites: Array<any>;
+  hasEnded?: boolean;
+}) => ({
+  type: Actions.LOAD_SPRITES,
   payload,
 });

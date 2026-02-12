@@ -6,6 +6,7 @@ import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH } from "../../constants";
 import { Sprite } from "../../Frames/reducers/frames";
 import Konva from "konva";
 import ArrowDropDown from "@mui/icons-material/ArrowDropDown";
+import { resolveSpriteUrl } from "../../helpers";
 
 async function uploadImage(file: File, presentationId: string) {
   // Step 1: get a presigned URL
@@ -81,7 +82,7 @@ export default function ExportVideo({
 
     for (const s of sprites) {
       const img = new window.Image();
-      img.src = `/assets/cells/${s.backgroundUrl}`;
+      img.src = resolveSpriteUrl(s.backgroundUrl);
 
       console.log("Rendering sprite", s.id, s);
 
@@ -105,7 +106,7 @@ export default function ExportVideo({
       canvas.toBlob(
         (b) => (b ? resolve(b) : reject(new Error("Canvas toBlob failed"))),
         "image/png",
-        1
+        1,
       );
     });
     return blob;
@@ -122,7 +123,7 @@ export default function ExportVideo({
       const nextFrame = frames[frameIdx + 1];
 
       const maxDuration = Math.max(
-        ...frame.sprites.map((s) => s.duration ?? 1)
+        ...frame.sprites.map((s) => s.duration ?? 1),
       );
 
       for (let i = 0; i < 30 * maxDuration; i++) {
@@ -251,7 +252,7 @@ export default function ExportVideo({
 
         const newFrame: Blob = await renderSprites(stage, newSprites);
         const filename = `frame-${String(frameIdx).padStart(4, "0")}-${String(
-          i
+          i,
         ).padStart(4, "0")}.png`;
         const file = new File([newFrame], filename, {
           type: newFrame.type || "image/png",
@@ -261,7 +262,7 @@ export default function ExportVideo({
     }
 
     const frameURLs = await Promise.all(
-      files.map((file) => uploadImage(file, presentationId))
+      files.map((file) => uploadImage(file, presentationId)),
     );
 
     try {

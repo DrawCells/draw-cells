@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { resolveSpriteUrl } from "../helpers";
 import { Image } from "react-konva";
 
 const CanvasSprite = React.forwardRef(
@@ -9,7 +10,7 @@ const CanvasSprite = React.forwardRef(
 
     React.useEffect(() => {
       const img = new window.Image();
-      img.src = `/assets/cells/${shapeProps.backgroundUrl}`;
+      img.src = resolveSpriteUrl(shapeProps.backgroundUrl);
       img.onload = () => setImage(img);
       img.onerror = (err) => console.error("Error loading image", err);
     }, [shapeProps.backgroundUrl]);

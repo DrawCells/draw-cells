@@ -1,6 +1,7 @@
 import { Box, Popover, Typography } from "@mui/material";
 import React, { useMemo, useRef, useState } from "react";
 import SidebarSprite from "./SidebarSprite";
+import { resolveSpriteUrl } from "../helpers";
 
 interface SidebarSpriteWithVariantsProps {
   name: string;
@@ -79,7 +80,7 @@ export default function SidebarSpriteWithVariants({
         }}
       >
         <img
-          src={`/assets/cells/${previewBackgroundUrl}`}
+          src={resolveSpriteUrl(previewBackgroundUrl)}
           alt={name}
           width={50}
           height={50}

@@ -3,6 +3,7 @@ import { SPRITE_TO_SVG_ELEMENT_MAP } from "../constants";
 import { Sprite } from "../Frames/reducers/frames";
 import { Box } from "@mui/material";
 import InlineSvg from "./SvgInline";
+import { resolveSpriteUrl } from "../helpers";
 
 const styles: any = {
   position: "absolute",
@@ -12,7 +13,7 @@ const styles: any = {
 };
 
 const BaseSpritePreview = memo(function BoxDragPreview(
-  props: Sprite & { name: string; ratio: number }
+  props: Sprite & { name: string; ratio: number },
 ) {
   const [tickTock, setTickTock] = useState(false);
   useEffect(
@@ -20,7 +21,7 @@ const BaseSpritePreview = memo(function BoxDragPreview(
       const interval = setInterval(() => setTickTock(!tickTock), 500);
       return () => clearInterval(interval);
     },
-    [tickTock]
+    [tickTock],
   );
 
   return (
@@ -44,7 +45,7 @@ const BaseSpritePreview = memo(function BoxDragPreview(
       >
         {props.backgroundUrl && (
           <img
-            src={`/assets/cells/${props.backgroundUrl}`}
+            src={resolveSpriteUrl(props.backgroundUrl)}
             alt={props.name}
             width={50}
             height={50 / props.ratio}

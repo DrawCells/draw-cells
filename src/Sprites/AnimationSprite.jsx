@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
 import { animated, to, useSpring } from "@react-spring/konva";
+import { resolveSpriteUrl } from "../helpers";
 
 function getCurrentAndPrevSprite(animationProps) {
   const { prevFrame, id } = animationProps;
@@ -162,7 +163,7 @@ export default function AnimationSprite(props) {
 
   useEffect(() => {
     const newImg = new window.Image();
-    newImg.src = `/assets/cells/${backgroundUrl}`;
+    newImg.src = resolveSpriteUrl(backgroundUrl);
     newImg.onload = () => setImg(newImg);
   }, [backgroundUrl]);
 

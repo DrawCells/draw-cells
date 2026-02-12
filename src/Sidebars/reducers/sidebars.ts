@@ -9,6 +9,10 @@ const initialState: SidebarsState = {
     list: [],
     hasEnded: false,
   },
+  sprites: {
+    list: [],
+    hasEnded: false,
+  },
 };
 
 export interface SidebarsState {
@@ -19,11 +23,15 @@ export interface SidebarsState {
     list: Array<any>;
     hasEnded: boolean;
   };
+  sprites: {
+    list: Array<any>;
+    hasEnded: boolean;
+  };
 }
 
 export const sidebars = (
   state: SidebarsState = initialState,
-  action: PayloadAction<any>
+  action: PayloadAction<any>,
 ): SidebarsState => {
   const { type } = action;
   switch (type) {
@@ -49,6 +57,17 @@ export const sidebars = (
           list: [
             ...(state.backgrounds?.list || []),
             ...(action.payload.backgrounds || []),
+          ],
+          hasEnded: action.payload.hasEnded,
+        },
+      };
+    case Actions.LOAD_SPRITES:
+      return {
+        ...state,
+        sprites: {
+          list: [
+            ...(state.sprites?.list || []),
+            ...(action.payload.sprites || []),
           ],
           hasEnded: action.payload.hasEnded,
         },

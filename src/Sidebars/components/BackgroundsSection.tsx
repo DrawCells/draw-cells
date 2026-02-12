@@ -23,12 +23,23 @@ function BackgroundsSection() {
   );
 
   const pageTokens = useRef<(string | undefined)[]>([]);
+  const hasLoadedOnceRef = useRef(false);
   const [page, setPage] = useState<number>(0);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
-    if (!isSpritesSidebarOpen || backgrounds.hasEnded) return;
+    if (
+      !isSpritesSidebarOpen ||
+      !isExpanded ||
+      backgrounds.hasEnded ||
+      (hasLoadedOnceRef.current && page === 0)
+    )
+      return;
 
     const getBg = async () => {
+      if (page === 0) {
+        hasLoadedOnceRef.current = true;
+      }
       const currentToken = pageTokens.current?.shift();
       const imageRefs = await list(storageRef(storage, "backgrounds"), {
         maxResults: 10,
@@ -50,7 +61,7 @@ function BackgroundsSection() {
     };
 
     getBg();
-  }, [isSpritesSidebarOpen, dispatch, page]);
+  }, [isSpritesSidebarOpen, isExpanded, dispatch, page]);
 
   const handleNext = () => {
     setPage(page + 1);
@@ -62,6 +73,8 @@ function BackgroundsSection() {
 
   return (
     <Accordion
+      expanded={isExpanded}
+      onChange={(_, expanded) => setIsExpanded(expanded)}
       elevation={0}
       sx={{
         width: "100%",

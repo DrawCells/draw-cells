@@ -2,6 +2,7 @@ import { Box, Typography } from "@mui/material";
 import React, { useEffect, useState } from "react";
 import { useDrag } from "react-dnd";
 import { getEmptyImage } from "react-dnd-html5-backend";
+import { resolveSpriteUrl } from "../helpers";
 
 interface SidebarSpriteProps {
   backgroundUrl: string;
@@ -67,7 +68,7 @@ export default function SidebarSprite({
       >
         {backgroundUrl && (
           <img
-            src={`/assets/cells/${backgroundUrl}`}
+            src={resolveSpriteUrl(backgroundUrl)}
             alt={name}
             width={50}
             height={50}
