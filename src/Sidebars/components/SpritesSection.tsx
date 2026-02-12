@@ -14,12 +14,15 @@ import SidebarSprite from "../../Sprites/SidebarSprite";
 import { loadSprites } from "../actions";
 import State from "../../stateInterface";
 import { db, storage } from "../../firebase-config";
+import SidebarSpriteWithVariants from "../../Sprites/SidebarSpriteWithVariants";
 
 interface SpriteInfo {
   id?: string;
   name: string;
   tags?: string[];
-  imageUrl: string;
+  baseImageUrl: string;
+  previewImageUrl?: string;
+  variants?: string[];
 }
 
 export default function SpritesSection() {
@@ -51,7 +54,14 @@ export default function SpritesSection() {
       const data = (res.val() || {}) as Record<string, SpriteInfo>;
       const list = await Promise.all(
         Object.entries(data).map(async ([id, sprite]) => {
-          let imageUrl = sprite.imageUrl;
+          let imageUrl = sprite.baseImageUrl;
+          const firstVariant =
+            sprite.variants && sprite.variants.length > 0
+              ? sprite.variants[0]
+              : undefined;
+          if (firstVariant) {
+            imageUrl = `${sprite.baseImageUrl} - ${firstVariant}.svg`;
+          }
           if (imageUrl) {
             try {
               imageUrl = await getDownloadURL(storageRef(storage, imageUrl));
@@ -63,7 +73,9 @@ export default function SpritesSection() {
             id,
             name: sprite.name,
             tags: Array.isArray(sprite.tags) ? sprite.tags : [],
-            imageUrl,
+            baseImageUrl: sprite.baseImageUrl,
+            previewImageUrl: imageUrl,
+            variants: Array.isArray(sprite.variants) ? sprite.variants : [],
           };
         }),
       );
@@ -145,10 +157,12 @@ export default function SpritesSection() {
         >
           {isSpritesListLoading ? <CircularProgress /> : null}
           {filteredSprites.map((sprite, i) => (
-            <SidebarSprite
+            <SidebarSpriteWithVariants
               key={sprite.id ?? `sprite-${i}`}
               name={sprite.name}
-              backgroundUrl={sprite.imageUrl}
+              variants={sprite.variants}
+              previewImageUrl={sprite.previewImageUrl}
+              baseImageUrl={sprite.baseImageUrl}
             />
           ))}
         </Box>

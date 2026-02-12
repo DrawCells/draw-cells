@@ -1,30 +1,31 @@
 import { Box, Popover, Typography } from "@mui/material";
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { getDownloadURL, ref as storageRef } from "firebase/storage";
 import SidebarSprite from "./SidebarSprite";
 import { resolveSpriteUrl } from "../helpers";
+import { storage } from "../firebase-config";
 
 interface SidebarSpriteWithVariantsProps {
   name: string;
-  category: string;
+  baseImageUrl: string;
+  previewImageUrl: string;
   variants?: string[];
 }
 
 export default function SidebarSpriteWithVariants({
   name,
-  category,
+  baseImageUrl,
+  previewImageUrl,
   variants,
 }: SidebarSpriteWithVariantsProps) {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  const [variantUrls, setVariantUrls] = useState<Record<string, string>>({});
+  const [isLoadingVariants, setIsLoadingVariants] = useState(false);
 
   const variantList = useMemo(
     () => (variants && variants.length > 0 ? variants : [undefined]),
     [variants],
   );
-
-  const previewBackgroundUrl = useMemo(() => {
-    const firstVariant = variantList[0];
-    return `${category}/${name}${firstVariant ? ` - ${firstVariant}` : ""}.svg`;
-  }, [category, name, variantList]);
 
   const handleOpen = (target: HTMLElement) => {
     setAnchorEl(target);
@@ -45,12 +46,50 @@ export default function SidebarSpriteWithVariants({
   const open = Boolean(anchorEl);
   const hasVariants = Boolean(variants && variants.length > 0);
   const variantsCount = variants?.length ?? 0;
+  const basePath = useMemo(() => {
+    if (!baseImageUrl) return "";
+    return baseImageUrl.endsWith(".svg")
+      ? baseImageUrl.slice(0, -4)
+      : baseImageUrl;
+  }, [baseImageUrl]);
+
+  useEffect(() => {
+    if (!open || !variants || variants.length === 0 || !basePath) return;
+
+    const missingVariants = variants.filter(
+      (variant) => !variantUrls[variant],
+    );
+    if (missingVariants.length === 0) return;
+
+    const loadVariantUrls = async () => {
+      setIsLoadingVariants(true);
+      const entries = await Promise.all(
+        missingVariants.map(async (variant) => {
+          const imagePath = `${basePath} - ${variant}.svg`;
+          try {
+            const url = await getDownloadURL(storageRef(storage, imagePath));
+            return [variant, url] as const;
+          } catch (error) {
+            console.error("Failed to load variant URL", error);
+            return [variant, ""] as const;
+          }
+        }),
+      );
+      setVariantUrls((prev) => ({
+        ...prev,
+        ...Object.fromEntries(entries),
+      }));
+      setIsLoadingVariants(false);
+    };
+
+    loadVariantUrls();
+  }, [open, variants, basePath, variantUrls]);
 
   if (!hasVariants) {
     return (
       <SidebarSprite
         name={name}
-        backgroundUrl={`${category}/${name}.svg`}
+        backgroundUrl={baseImageUrl}
         onDragStart={handleVariantDragStart}
       />
     );
@@ -80,7 +119,7 @@ export default function SidebarSpriteWithVariants({
         }}
       >
         <img
-          src={resolveSpriteUrl(previewBackgroundUrl)}
+          src={resolveSpriteUrl(previewImageUrl)}
           alt={name}
           width={50}
           height={50}
@@ -143,7 +182,7 @@ export default function SidebarSpriteWithVariants({
         >
           {variantList.map((variant, index) => {
             const label = variant || "Default";
-            const url = `${category}/${name}${variant ? ` - ${variant}` : ""}.svg`;
+            const url = variant ? variantUrls[variant] : "";
             return (
               <SidebarSprite
                 key={`variant-${index}-${label}`}
@@ -154,6 +193,11 @@ export default function SidebarSpriteWithVariants({
             );
           })}
         </Box>
+        {isLoadingVariants ? (
+          <Typography variant="caption" sx={{ mt: 1, display: "block" }}>
+            Loading variants...
+          </Typography>
+        ) : null}
       </Popover>
     </Box>
   );
