@@ -11,13 +11,12 @@ import {
   Toolbar,
   Typography,
 } from "@mui/material";
-import { signOut } from "firebase/auth";
 import React, { useEffect, useState, useTransition } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { auth } from "../../firebase-config";
-import { toggleLoginModalOpen } from "../../Home/reducers";
 import State from "../../stateInterface";
+import { setUser } from "../../Home/reducers";
 import { createNewPresentation } from "../actions";
+import { logoutAction } from "../../../app/login/actions";
 import { useRouter } from "next/navigation";
 
 const HomeHeader = () => {
@@ -32,12 +31,10 @@ const HomeHeader = () => {
     setHasMounted(true);
   }, []);
 
-  const openLoginModal = () => {
-    dispatch(toggleLoginModalOpen(true));
-  };
-
-  const handleLogOut = () => {
-    signOut(auth);
+  const handleLogOut = async () => {
+    await logoutAction();
+    dispatch(setUser(null));
+    router.refresh();
   };
 
   const handleClose = () => {
@@ -46,9 +43,8 @@ const HomeHeader = () => {
 
   const handleNewPresentation = () => {
     startTransition(async () => {
-      const res = await createNewPresentation({ user });
+      const res = await createNewPresentation();
       if (res) {
-        console.log("handleNewPresentation", res);
         router.push(`/presentations/${res.key}`);
       } else {
         console.error("Failed to create new presentation");
@@ -70,7 +66,7 @@ const HomeHeader = () => {
           )}
         </Stack>
         {!user && (
-          <Button color="inherit" onClick={openLoginModal}>
+          <Button color="inherit" onClick={() => router.push("/login")}>
             Log in
           </Button>
         )}

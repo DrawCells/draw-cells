@@ -1,8 +1,10 @@
 "use server";
 
 import { db } from "../../lib/firebaseAdmin";
+import { getSessionUser } from "../../lib/auth";
 
-export async function createNewPresentation({ user }: { user: any }) {
+export async function createNewPresentation() {
+  const user = await getSessionUser();
   if (!user) return;
 
   const newPresentation = await db.ref().child("presentations").push({

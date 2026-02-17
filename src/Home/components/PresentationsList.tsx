@@ -31,7 +31,7 @@ export default function PresentationsList() {
     startTransition(async () => {
       if (!user) return;
 
-      const res = await createNewPresentation({ user });
+      const res = await createNewPresentation();
       if (res) {
         console.log("handleNewPresentation", res);
         router.push(`/presentations/${res.key}`);
