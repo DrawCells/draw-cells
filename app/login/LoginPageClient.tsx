@@ -4,6 +4,7 @@ import {
   Box,
   Button,
   CircularProgress,
+  Divider,
   Grid,
   Link,
   Paper,
@@ -12,7 +13,59 @@ import {
 } from "@mui/material";
 import React, { useActionState, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { loginAction, signupAction } from "./actions";
+import { signInWithPopup } from "firebase/auth";
+import { auth as firebaseAuth, googleProvider } from "../../src/firebase-config";
+import { googleLoginAction, loginAction, signupAction } from "./actions";
+
+function GoogleSignInButton() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await signInWithPopup(firebaseAuth, googleProvider);
+      const idToken = await result.user.getIdToken();
+      const res = await googleLoginAction(idToken);
+      if (res.success) {
+        router.push("/");
+      } else {
+        setError(res.error || "Google sign-in failed");
+      }
+    } catch (e: any) {
+      if (e.code !== "auth/popup-closed-by-user") {
+        setError(e.message || "Google sign-in failed");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <>
+      {error && (
+        <Typography color="error" fontSize={14} sx={{ mb: 1 }}>
+          {error}
+        </Typography>
+      )}
+      <Button
+        variant="outlined"
+        fullWidth
+        onClick={handleGoogleSignIn}
+        disabled={loading}
+        sx={{ textTransform: "none" }}
+      >
+        {loading ? (
+          <CircularProgress size={20} />
+        ) : (
+          "Sign in with Google"
+        )}
+      </Button>
+    </>
+  );
+}
 
 function LoginForm({ toggleForm }: { toggleForm: (mode: string) => void }) {
   const [state, formAction, isPending] = useActionState(loginAction, {
@@ -87,6 +140,8 @@ function LoginForm({ toggleForm }: { toggleForm: (mode: string) => void }) {
             </>
           )}
         </Button>
+        <Divider sx={{ my: 2 }}>or</Divider>
+        <GoogleSignInButton />
       </Box>
     </form>
   );
@@ -178,6 +233,8 @@ function RegisterForm({ toggleForm }: { toggleForm: (mode: string) => void }) {
             </>
           )}
         </Button>
+        <Divider sx={{ my: 2 }}>or</Divider>
+        <GoogleSignInButton />
       </Box>
     </form>
   );

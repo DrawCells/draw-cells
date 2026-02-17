@@ -129,6 +129,26 @@ export async function logoutAction(): Promise<{ success: boolean }> {
   return { success: true };
 }
 
+export async function googleLoginAction(
+  idToken: string
+): Promise<AuthResult> {
+  try {
+    const decodedToken = await auth.verifyIdToken(idToken);
+    await createSessionCookie(idToken);
+
+    return {
+      success: true,
+      user: {
+        uid: decodedToken.uid,
+        email: decodedToken.email || null,
+        displayName: decodedToken.name || null,
+      },
+    };
+  } catch (e: any) {
+    return { success: false, error: e.message || "Google sign-in failed" };
+  }
+}
+
 export async function getSession() {
   return getSessionUser();
 }
