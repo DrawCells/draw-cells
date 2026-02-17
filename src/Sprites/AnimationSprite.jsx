@@ -163,6 +163,7 @@ export default function AnimationSprite(props) {
 
   useEffect(() => {
     const newImg = new window.Image();
+    newImg.crossOrigin = "anonymous";
     newImg.src = resolveSpriteUrl(backgroundUrl);
     newImg.onload = () => setImg(newImg);
   }, [backgroundUrl]);

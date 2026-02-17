@@ -56,9 +56,7 @@ export default function SidebarSpriteWithVariants({
   useEffect(() => {
     if (!open || !variants || variants.length === 0 || !basePath) return;
 
-    const missingVariants = variants.filter(
-      (variant) => !variantUrls[variant],
-    );
+    const missingVariants = variants.filter((variant) => !variantUrls[variant]);
     if (missingVariants.length === 0) return;
 
     const loadVariantUrls = async () => {
@@ -89,7 +87,7 @@ export default function SidebarSpriteWithVariants({
     return (
       <SidebarSprite
         name={name}
-        backgroundUrl={baseImageUrl}
+        backgroundUrl={previewImageUrl}
         onDragStart={handleVariantDragStart}
       />
     );

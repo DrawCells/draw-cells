@@ -48,7 +48,8 @@
   "scripts": {
     "dev": "PORT=3002 next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "upload:sprites": "tsx scripts/uploadSpritesToDb.ts"
   },
   "eslintConfig": {
     "extends": [
@@ -69,6 +70,8 @@
     ]
   },
   "devDependencies": {
-    "@svgr/webpack": "^8.1.0"
+    "@svgr/webpack": "^8.1.0",
+    "dotenv": "^16.4.5",
+    "tsx": "^4.19.2"
   }
 }

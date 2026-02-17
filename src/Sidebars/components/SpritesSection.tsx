@@ -10,7 +10,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { get, ref } from "firebase/database";
 import { getDownloadURL, ref as storageRef } from "firebase/storage";
-import SidebarSprite from "../../Sprites/SidebarSprite";
 import { loadSprites } from "../actions";
 import State from "../../stateInterface";
 import { db, storage } from "../../firebase-config";
@@ -60,11 +59,13 @@ export default function SpritesSection() {
               ? sprite.variants[0]
               : undefined;
           if (firstVariant) {
-            imageUrl = `${sprite.baseImageUrl} - ${firstVariant}.svg`;
+            imageUrl = `${sprite.baseImageUrl} - ${firstVariant}`;
           }
           if (imageUrl) {
             try {
-              imageUrl = await getDownloadURL(storageRef(storage, imageUrl));
+              imageUrl = await getDownloadURL(
+                storageRef(storage, `${imageUrl}.svg`),
+              );
             } catch (error) {
               console.error("Failed to load sprite URL", error);
             }

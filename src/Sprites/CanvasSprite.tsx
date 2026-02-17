@@ -10,6 +10,7 @@ const CanvasSprite = React.forwardRef(
 
     React.useEffect(() => {
       const img = new window.Image();
+      img.crossOrigin = "anonymous";
       img.src = resolveSpriteUrl(shapeProps.backgroundUrl);
       img.onload = () => setImage(img);
       img.onerror = (err) => console.error("Error loading image", err);

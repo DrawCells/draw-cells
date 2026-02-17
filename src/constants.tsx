@@ -9,7 +9,7 @@ export const VIEWPORT_WIDTH = 810;
 export const VIEWPORT_HEIGHT = 540;
 
 export const SPRITES_BY_CATEGORY_TO_SVG_ELEMENT_MAP = {
-  "Immune cells": {
+  "Immune Cells": {
     "B cell": {
       name: "B cell",
       tags: [
@@ -622,7 +622,7 @@ export const SPRITES_BY_CATEGORY_TO_SVG_ELEMENT_MAP = {
       variants: ["blue", "green", "grey", "orange", "purple", "red", "yellow"],
     },
   },
-  "Lab animals": {
+  "Lab Animals": {
     Fish: {
       name: "Fish",
       tags: [
@@ -679,7 +679,7 @@ export const SPRITES_BY_CATEGORY_TO_SVG_ELEMENT_MAP = {
       variants: ["black", "grey", "white"],
     },
   },
-  "Lab icons": {
+  "Lab Icons": {
     Microscope: {
       name: "Microscope",
       tags: [
@@ -812,7 +812,7 @@ export const SPRITES_BY_CATEGORY_TO_SVG_ELEMENT_MAP = {
       tags: ["blood", "immune", "immunity", "organ", "spleen"],
     },
   },
-  "Structural cells": {
+  "Structural Cells": {
     "Apoptotic cancer cell": {
       name: "Apoptotic cancer cell",
       tags: [
@@ -1070,8 +1070,8 @@ export const SPRITE_TO_SVG_ELEMENT_MAP: Record<
       Object.entries(cells).map(([key, v]) => {
         const name = v.name || key;
         return [name, { ...v, category }];
-      })
-  )
+      }),
+  ),
 );
 
 // export const SPRITE_TO_SVG_ELEMENT_MAP = {

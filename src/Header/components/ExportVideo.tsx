@@ -82,6 +82,7 @@ export default function ExportVideo({
 
     for (const s of sprites) {
       const img = new window.Image();
+      img.crossOrigin = "anonymous";
       img.src = resolveSpriteUrl(s.backgroundUrl);
 
       console.log("Rendering sprite", s.id, s);

@@ -2,7 +2,6 @@ import React, { memo, useEffect, useState } from "react";
 import { SPRITE_TO_SVG_ELEMENT_MAP } from "../constants";
 import { Sprite } from "../Frames/reducers/frames";
 import { Box } from "@mui/material";
-import InlineSvg from "./SvgInline";
 import { resolveSpriteUrl } from "../helpers";
 
 const styles: any = {
