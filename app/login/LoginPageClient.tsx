@@ -32,7 +32,6 @@ function LoginForm({ toggleForm }: { toggleForm: (mode: string) => void }) {
         sx={{
           display: "flex",
           flexDirection: "column",
-          width: "100%",
           px: 4,
           py: 3,
         }}
@@ -111,7 +110,6 @@ function RegisterForm({ toggleForm }: { toggleForm: (mode: string) => void }) {
         sx={{
           display: "flex",
           flexDirection: "column",
-          width: "100%",
           px: 4,
           py: 3,
         }}
@@ -188,7 +186,7 @@ function RegisterForm({ toggleForm }: { toggleForm: (mode: string) => void }) {
 export default function LoginPageClient() {
   const searchParams = useSearchParams();
   const [currentForm, setCurrentForm] = useState(
-    searchParams.get("mode") === "signup" ? "sign_up" : "sign_in"
+    searchParams.get("mode") === "signup" ? "sign_up" : "sign_in",
   );
 
   return (
@@ -200,7 +198,12 @@ export default function LoginPageClient() {
     >
       <Paper
         elevation={3}
-        sx={{ maxWidth: 700, width: "100%", overflow: "hidden" }}
+        sx={{
+          maxWidth: 700,
+          width: "100%",
+          borderRadius: 4,
+          overflow: "hidden",
+        }}
       >
         <Grid container>
           <Grid
@@ -217,7 +220,7 @@ export default function LoginPageClient() {
               Welcome
             </Typography>
           </Grid>
-          <Grid size={{ xs: 12, sm: 7 }}>
+          <Grid size={{ xs: 12, sm: 7 }} sx={{ p: 2 }}>
             {currentForm === "sign_in" && (
               <LoginForm toggleForm={setCurrentForm} />
             )}
