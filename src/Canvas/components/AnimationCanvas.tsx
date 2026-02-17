@@ -87,6 +87,7 @@ function AnimationCanvas() {
     (state: State) => state.frames.currentFrame.backgroundUrl,
   );
   const framesList = useSelector((state: State) => state.frames.frames);
+  const user = useSelector((state: State) => state.home.user);
   const nextFrame = useSelector((state: State) => state.frames.nextFrame);
 
   const isAnimationPreviewModalOpen = useSelector(
@@ -131,15 +132,20 @@ function AnimationCanvas() {
   useEffect(() => {
     dispatch(setIsFramesSaving(true));
     const t = setTimeout(async () => {
-      const res = await update(ref(db), {
+      const updates: Record<string, any> = {
         [`presentations/${presentationId}/frames`]: framesList,
-      });
+      };
+      if (user?.uid && framesList[0]?.preview) {
+        updates[`user-presentations/${user.uid}/${presentationId}/previewImage`] =
+          framesList[0].preview;
+      }
+      await update(ref(db), updates);
       dispatch(setIsFramesSaving(false));
     }, 2000);
     return () => {
       clearTimeout(t);
     };
-  }, [framesList, presentationId, dispatch]);
+  }, [framesList, presentationId, user, dispatch]);
 
   // Get bg from db
   useEffect(() => {

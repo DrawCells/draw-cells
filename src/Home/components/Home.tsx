@@ -5,21 +5,29 @@ import { useDispatch } from "react-redux";
 import HomeHeader from "../../Header/components/HomeHeader";
 import PresentationsList from "./PresentationsList";
 import { setUser } from "../reducers";
-import { getSession } from "../../../app/login/actions";
 
-export default function Home() {
+interface User {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+}
+
+interface HomeProps {
+  user: User;
+  presentations: Record<string, { title: string; previewImage?: string }>;
+}
+
+export default function Home({ user, presentations }: HomeProps) {
   const dispatch = useDispatch();
 
   useEffect(() => {
-    getSession().then((user) => {
-      dispatch(setUser(user));
-    });
-  }, [dispatch]);
+    dispatch(setUser(user));
+  }, [dispatch, user]);
 
   return (
     <>
       <HomeHeader />
-      <PresentationsList />
+      <PresentationsList user={user} initialPresentations={presentations} />
     </>
   );
 }

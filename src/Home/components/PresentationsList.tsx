@@ -7,33 +7,42 @@ import {
   Card,
   CardActions,
   CardContent,
-  CircularProgress,
+  CardMedia,
   Container,
   Grid,
   Stack,
   Typography,
 } from "@mui/material";
-import { child, get, ref, remove } from "firebase/database";
-import React, { startTransition, useEffect, useState } from "react";
-import { useSelector } from "react-redux";
+import React, { startTransition, useState } from "react";
 import { useRouter } from "next/navigation";
-import { db } from "../../firebase-config";
-import State from "../../stateInterface";
-import { createNewPresentation } from "../../Header/actions";
+import {
+  createNewPresentation,
+  deletePresentation as deletePresentationAction,
+} from "../../Header/actions";
 
-export default function PresentationsList() {
-  const user = useSelector((state: State) => state.home.user);
-  const [isPresentationsLoading, setIsPresentationsLoading] = useState(false);
-  const [presentations, setPresentations] = useState({});
+interface User {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+}
+
+interface PresentationsListProps {
+  user: User;
+  initialPresentations: Record<string, { title: string; previewImage?: string }>;
+}
+
+export default function PresentationsList({
+  user,
+  initialPresentations,
+}: PresentationsListProps) {
+  const [presentations, setPresentations] =
+    useState<Record<string, { title: string; previewImage?: string }>>(initialPresentations);
   const router = useRouter();
 
   const handleNewPresentation = async () => {
     startTransition(async () => {
-      if (!user) return;
-
       const res = await createNewPresentation();
       if (res) {
-        console.log("handleNewPresentation", res);
         router.push(`/presentations/${res.key}`);
       } else {
         console.error("Failed to create new presentation");
@@ -41,40 +50,16 @@ export default function PresentationsList() {
     });
   };
 
-  useEffect(() => {
-    setIsPresentationsLoading(true);
-    const getData = async () => {
-      try {
-        if (!user) {
-          setPresentations({});
-          return;
-        }
-        const res = await get(
-          child(ref(db), `/user-presentations/${user.uid}`)
-        );
-        setPresentations(res.val() || {});
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setIsPresentationsLoading(false);
-      }
-    };
-    getData();
-  }, [user]);
-
-  const deletePresentation = async (presId: string) => {
-    if (!user) return;
-    await remove(ref(db, `/presentations/${presId}`));
-    await remove(ref(db, `/user-presentations/${user.uid}/${presId}`));
-    const res = await get(child(ref(db), `/user-presentations/${user.uid}`));
-    setPresentations(res.val() || {});
+  const handleDelete = async (presId: string) => {
+    const res = await deletePresentationAction(presId);
+    if (res.success) {
+      const { [presId]: _, ...rest } = presentations;
+      setPresentations(rest);
+    }
   };
-
-  if (!user) return null;
 
   return (
     <Container maxWidth={false} sx={{ mt: 3 }}>
-      {isPresentationsLoading && <CircularProgress />}
       <Typography variant="h5" sx={{ mb: 2 }}>
         My Presentations
       </Typography>
@@ -83,6 +68,14 @@ export default function PresentationsList() {
           {Object.entries(presentations).map(([id, val]: any) => (
             <Grid key={id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
               <Card>
+                {val.previewImage && (
+                  <CardMedia
+                    component="img"
+                    image={val.previewImage}
+                    alt={val.title}
+                    sx={{ height: 160, objectFit: "cover" }}
+                  />
+                )}
                 <CardContent>
                   <Typography variant="h5">
                     <b>{val.title}</b>
@@ -103,7 +96,7 @@ export default function PresentationsList() {
                     <Button
                       variant="outlined"
                       color="error"
-                      onClick={() => deletePresentation(id)}
+                      onClick={() => handleDelete(id)}
                       startIcon={<DeleteIcon fontSize="small" />}
                     >
                       Delete

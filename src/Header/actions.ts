@@ -3,6 +3,16 @@
 import { db } from "../../lib/firebaseAdmin";
 import { getSessionUser } from "../../lib/auth";
 
+export async function deletePresentation(presId: string) {
+  const user = await getSessionUser();
+  if (!user) return { success: false };
+
+  await db.ref(`/presentations/${presId}`).remove();
+  await db.ref(`/user-presentations/${user.uid}/${presId}`).remove();
+
+  return { success: true };
+}
+
 export async function createNewPresentation() {
   const user = await getSessionUser();
   if (!user) return;
