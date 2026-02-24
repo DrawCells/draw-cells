@@ -1,7 +1,7 @@
 "use client";
 
 import { CircularProgress, useTheme } from "@mui/material";
-import { get, ref, update } from "firebase/database";
+import { get, ref } from "firebase/database";
 import React, { useEffect, useRef, useState } from "react";
 import { DndProvider, useDrop, XYCoord } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -132,14 +132,16 @@ function AnimationCanvas() {
   useEffect(() => {
     dispatch(setIsFramesSaving(true));
     const t = setTimeout(async () => {
-      const updates: Record<string, any> = {
-        [`presentations/${presentationId}/frames`]: framesList,
-      };
-      if (user?.uid && framesList[0]?.preview) {
-        updates[`user-presentations/${user.uid}/${presentationId}/previewImage`] =
-          framesList[0].preview;
-      }
-      await update(ref(db), updates);
+      await fetch("/api/presentations/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          presentationId,
+          frames: framesList,
+          userId: user?.uid,
+          previewImage: framesList[0]?.preview,
+        }),
+      });
       dispatch(setIsFramesSaving(false));
     }, 2000);
     return () => {

@@ -12,9 +12,6 @@ import State from "../../stateInterface";
 import { setCurrentFrameBackground } from "../../Frames/actions";
 import { loadBackgrounds } from "../actions";
 
-import { getDownloadURL, ref as storageRef, list } from "firebase/storage";
-import { storage } from "../../firebase-config";
-
 function BackgroundsSection() {
   const dispatch = useDispatch();
   const backgrounds = useSelector((state: State) => state.sidebars.backgrounds);
@@ -41,21 +38,20 @@ function BackgroundsSection() {
         hasLoadedOnceRef.current = true;
       }
       const currentToken = pageTokens.current?.shift();
-      const imageRefs = await list(storageRef(storage, "backgrounds"), {
-        maxResults: 10,
-        pageToken: currentToken,
+      const params = new URLSearchParams({
+        prefix: "backgrounds",
+        maxResults: "10",
       });
-      pageTokens.current?.push(imageRefs.nextPageToken);
-      const images = await Promise.all<any>(
-        imageRefs.items.map(async (itemRef) => {
-          const url = await getDownloadURL(itemRef);
-          return url;
-        }),
-      );
+      if (currentToken) params.set("pageToken", currentToken);
+
+      const res = await fetch(`/api/storage?${params}`);
+      const data = await res.json();
+
+      pageTokens.current?.push(data.nextPageToken);
       dispatch(
         loadBackgrounds({
-          backgrounds: images,
-          hasEnded: !pageTokens.current[0],
+          backgrounds: data.urls || [],
+          hasEnded: !data.nextPageToken,
         }),
       );
     };
@@ -108,7 +104,7 @@ function BackgroundsSection() {
               key={`bg-image-${index}`}
               onClick={() => handleFrameBackground(bg)}
               style={{
-                width: "100%",
+                width: "100px",
                 display: "flex",
                 justifyContent: "center",
               }}

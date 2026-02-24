@@ -9,10 +9,9 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { get, ref } from "firebase/database";
-import { getDownloadURL, ref as storageRef } from "firebase/storage";
 import { loadSprites } from "../actions";
 import State from "../../stateInterface";
-import { db, storage } from "../../firebase-config";
+import { db } from "../../firebase-config";
 import SidebarSpriteWithVariants from "../../Sprites/SidebarSpriteWithVariants";
 
 interface SpriteInfo {
@@ -63,9 +62,11 @@ export default function SpritesSection() {
           }
           if (imageUrl) {
             try {
-              imageUrl = await getDownloadURL(
-                storageRef(storage, `${imageUrl}.svg`),
+              const res = await fetch(
+                `/api/storage?path=${encodeURIComponent(`${imageUrl}.svg`)}`,
               );
+              const data = await res.json();
+              if (data.url) imageUrl = data.url;
             } catch (error) {
               console.error("Failed to load sprite URL", error);
             }

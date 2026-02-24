@@ -1,9 +1,7 @@
 import { Box, Popover, Typography } from "@mui/material";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { getDownloadURL, ref as storageRef } from "firebase/storage";
 import SidebarSprite from "./SidebarSprite";
 import { resolveSpriteUrl } from "../helpers";
-import { storage } from "../firebase-config";
 
 interface SidebarSpriteWithVariantsProps {
   name: string;
@@ -61,22 +59,27 @@ export default function SidebarSpriteWithVariants({
 
     const loadVariantUrls = async () => {
       setIsLoadingVariants(true);
-      const entries = await Promise.all(
-        missingVariants.map(async (variant) => {
-          const imagePath = `${basePath} - ${variant}.svg`;
-          try {
-            const url = await getDownloadURL(storageRef(storage, imagePath));
-            return [variant, url] as const;
-          } catch (error) {
-            console.error("Failed to load variant URL", error);
-            return [variant, ""] as const;
-          }
-        }),
-      );
-      setVariantUrls((prev) => ({
-        ...prev,
-        ...Object.fromEntries(entries),
-      }));
+      try {
+        const paths = missingVariants.map(
+          (variant) => `${basePath} - ${variant}.svg`,
+        );
+        const res = await fetch("/api/storage", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ paths }),
+        });
+        const data = await res.json();
+        const entries = missingVariants.map((variant, i) => [
+          variant,
+          data.urls?.[i]?.url || "",
+        ]);
+        setVariantUrls((prev) => ({
+          ...prev,
+          ...Object.fromEntries(entries),
+        }));
+      } catch (error) {
+        console.error("Failed to load variant URLs", error);
+      }
       setIsLoadingVariants(false);
     };
 
