@@ -392,15 +392,13 @@ function AnimationCanvas() {
   };
 
   // SPRITE DRAG AND DROP INSIDE CANVAS
-  const handleDrag = (e: any) => {
-    for (let n of e.target.nodes()) {
-      const commonDetails = { id: n.attrs.spriteId };
-      dispatch(
-        updateSprite({ field: "positionX", value: n.x(), ...commonDetails }),
-      );
-      dispatch(
-        updateSprite({ field: "positionY", value: n.y(), ...commonDetails }),
-      );
+  const handleDrag = (e: any, originalPos: { x: number; y: number }) => {
+    const node = e.target;
+    const dx = node.x() - originalPos.x;
+    const dy = node.y() - originalPos.y;
+    for (const sel of selectedSprites) {
+      dispatch(updateSprite({ field: "positionX", value: sel.position.x + dx, id: sel.id }));
+      dispatch(updateSprite({ field: "positionY", value: sel.position.y + dy, id: sel.id }));
     }
   };
 
@@ -519,10 +517,12 @@ function AnimationCanvas() {
                             }}
                             ref={shapeRefs.current[s.id]}
                             spriteId={s.id}
-                            onMouseEnter={() => setCursor("pointer")}
+                            onMouseEnter={() => setCursor(isSelected ? "move" : "pointer")}
                             onMouseLeave={() => setCursor("default")}
                             offsetX={s.width / 2}
                             offsetY={s.height / 2}
+                            draggable={!!isSelected}
+                            onDragEnd={(e: any) => handleDrag(e, s.position)}
                           />
                         </React.Fragment>
                       );
@@ -537,12 +537,7 @@ function AnimationCanvas() {
                           }
                           return newBox;
                         }}
-                        draggable
-                        shouldOverdrawWholeArea
-                        onDragEnd={handleDrag}
                         onTransformEnd={handleTransform}
-                        onMouseEnter={() => setCursor("move")}
-                        onMouseLeave={() => setCursor("default")}
                       />
                     )}
                   </Layer>

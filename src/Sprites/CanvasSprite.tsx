@@ -9,6 +9,11 @@ const CanvasSprite = React.forwardRef(
     const [image, setImage] = React.useState<HTMLImageElement | null>(null);
 
     React.useEffect(() => {
+      if (!shapeProps.backgroundUrl) {
+        setImage(null);
+        return;
+      }
+
       const img = new window.Image();
       img.crossOrigin = "anonymous";
       img.src = resolveSpriteUrl(shapeProps.backgroundUrl);
@@ -21,16 +26,14 @@ const CanvasSprite = React.forwardRef(
     }
 
     return (
-      <React.Fragment>
-        <Image
-          spriteId={spriteId}
-          image={image}
-          onClick={onSelect}
-          onTap={onSelect}
-          ref={ref}
-          {...shapeProps}
-        />
-      </React.Fragment>
+      <Image
+        spriteId={spriteId}
+        image={image}
+        onClick={onSelect}
+        onTap={onSelect}
+        ref={ref}
+        {...shapeProps}
+      />
     );
   },
 );
