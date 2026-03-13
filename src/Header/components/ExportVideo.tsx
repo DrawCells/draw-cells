@@ -269,31 +269,50 @@ export default function ExportVideo({
     try {
       const response = await fetch("/api/export-video", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           frames: frameURLs,
           bucket: "draw-cells-s3-bucket",
-        }), // Replace with actual user ID
+        }),
       });
-      const blob = await response.blob(); // 👈 Get video as a Blob
-      const url = URL.createObjectURL(blob); // 👈 Create temporary URL
+      const { jobId } = await response.json();
 
-      // Create a temporary download link and click it
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "animation.mp4";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const poll = setInterval(async () => {
+        try {
+          const statusRes = await fetch(
+            `/api/export-video/status?jobId=${jobId}`,
+          );
+          const job = await statusRes.json();
 
-      // Optional: Revoke the object URL to free memory
-      URL.revokeObjectURL(url);
+          if (job.status === "completed") {
+            clearInterval(poll);
+            setIsExporting(false);
+            const videoRes = await fetch(job.videoUrl);
+            const blob = await videoRes.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = blobUrl;
+            link.download = "animation.mp4";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(blobUrl);
+          } else if (job.status === "failed") {
+            clearInterval(poll);
+            setIsExporting(false);
+            console.error("Export failed:", job.error);
+          }
+        } catch (pollError) {
+          clearInterval(poll);
+          setIsExporting(false);
+          console.error("Error polling export status:", pollError);
+        }
+      }, 3000);
     } catch (error) {
       console.error("Error exporting video:", error);
-    } finally {
       setIsExporting(false);
+    } finally {
+      stage.destroy();
     }
   };
 
@@ -301,21 +320,20 @@ export default function ExportVideo({
     setIsExporting(true);
     setAnchorEl(null);
     const stage = createStage();
-    const blob: Blob = await renderSprites(stage, currentFrame.sprites);
-
-    const fileUrl = URL.createObjectURL(blob);
-
-    // Create a temporary download link and click it
-    const link = document.createElement("a");
-    link.href = fileUrl;
-    link.download = "frame.png";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    // Optional: Revoke the object URL to free memory
-    URL.revokeObjectURL(fileUrl);
-    setIsExporting(false);
+    try {
+      const blob: Blob = await renderSprites(stage, currentFrame.sprites);
+      const fileUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = fileUrl;
+      link.download = "frame.png";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(fileUrl);
+    } finally {
+      stage.destroy();
+      setIsExporting(false);
+    }
   };
 
   return (

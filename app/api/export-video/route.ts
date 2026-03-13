@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "../../../lib/firebaseAdmin";
 
 const lambdaClient = new LambdaClient({
   region: "eu-central-1",
@@ -8,6 +9,25 @@ const lambdaClient = new LambdaClient({
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
   },
 });
+
+async function invokeLambda(payload: object) {
+  if (process.env.LAMBDA_LOCAL_URL) {
+    // Fire-and-forget, mirroring InvocationType: "Event"
+    fetch(process.env.LAMBDA_LOCAL_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }).catch((err) => console.error("[lambda-local-error]", err));
+    return;
+  }
+
+  const invoke = new InvokeCommand({
+    FunctionName: process.env.LAMBDA_FUNCTION_NAME!,
+    InvocationType: "Event",
+    Payload: new TextEncoder().encode(JSON.stringify(payload)),
+  });
+  await lambdaClient.send(invoke);
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,51 +40,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const invoke = new InvokeCommand({
-      FunctionName: process.env.LAMBDA_FUNCTION_NAME!, // e.g., "ffmpeg-images-to-video"
-      InvocationType: "RequestResponse",
-      Payload: new TextEncoder().encode(JSON.stringify(body)),
-    });
+    const jobId = crypto.randomUUID();
+    const appUrl = process.env.APP_URL!;
+    const callbackUrl = `${appUrl}/api/export-video/callback`;
 
-    const resp = await lambdaClient.send(invoke);
+    await db.ref(`exportJobs/${jobId}`).set({ status: "pending" });
 
-    if (!resp.Payload) {
-      return NextResponse.json(
-        { error: "Empty Lambda response" },
-        { status: 502 }
-      );
-    }
+    await invokeLambda({ ...body, jobId, callbackUrl });
 
-    const payloadStr = Buffer.from(resp.Payload as Uint8Array).toString(
-      "utf-8"
-    );
-    const payload = JSON.parse(payloadStr);
-    console.log("[lambda-payload]", payload);
-
-    // If your Lambda returns the MP4 directly (base64)
-    if (
-      payload.headers?.["Content-Type"] === "video/mp4" &&
-      payload.isBase64Encoded
-    ) {
-      const buf = Buffer.from(payload.body, "base64");
-      return new NextResponse(buf, {
-        status: payload.statusCode || 200,
-        headers: {
-          "Content-Type": "video/mp4",
-          "Content-Disposition": "attachment; filename=animation.mp4",
-        },
-      });
-    }
-
-    // Otherwise, just forward JSON (e.g., {status, bucket, key, url?})
-    return NextResponse.json(
-      typeof payload.body === "string"
-        ? JSON.parse(payload.body)
-        : payload.body,
-      { status: payload.statusCode || 200 }
-    );
+    return NextResponse.json({ jobId });
   } catch (error: any) {
-    console.error("[ffmpeg-error]", error);
+    console.error("[export-video-error]", error);
     return NextResponse.json(
       { error: error.message || "Internal Server Error" },
       { status: 500 }
