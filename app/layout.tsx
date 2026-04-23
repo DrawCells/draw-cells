@@ -5,6 +5,12 @@ import React from "react";
 import App from "../src/App";
 import { ThemeProvider } from "@mui/material/styles";
 import theme from "../src/theme";
+import { Nunito } from "next/font/google";
+
+const nunito = Nunito({
+  subsets: ["latin"],
+  variable: "--font-nunito",
+});
 
 export default function RootLayout({
   // Layouts must accept a children prop.
@@ -14,7 +20,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className={nunito.variable}>
       <body>
         <AppRouterCacheProvider>
           <ThemeProvider theme={theme}>

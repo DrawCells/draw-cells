@@ -14,13 +14,17 @@ import {
 import React, { useActionState, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signInWithPopup } from "firebase/auth";
-import { auth as firebaseAuth, googleProvider } from "../../src/firebase-config";
+import {
+  auth as firebaseAuth,
+  googleProvider,
+} from "../../src/firebase-config";
 import { googleLoginAction, loginAction, signupAction } from "./actions";
 
 function GoogleSignInButton() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  console.log("GoogleSignInButton rendered with error:", error);
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
@@ -57,11 +61,7 @@ function GoogleSignInButton() {
         disabled={loading}
         sx={{ textTransform: "none" }}
       >
-        {loading ? (
-          <CircularProgress size={20} />
-        ) : (
-          "Sign in with Google"
-        )}
+        {loading ? <CircularProgress size={20} /> : "Sign in with Google"}
       </Button>
     </>
   );

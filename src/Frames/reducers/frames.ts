@@ -579,7 +579,7 @@ export const frames = (
       if (spriteToCopy) {
         const newFrames = state.frames.map((f) =>
           f.id === payload.frameId
-            ? { ...f, sprites: [...f.sprites, spriteToCopy] }
+            ? { ...f, sprites: [...f.sprites, structuredClone(spriteToCopy)] }
             : f,
         );
         return {
@@ -597,7 +597,7 @@ export const frames = (
       if (spritesToCopy) {
         const newFrames = state.frames.map((f) =>
           f.id === payload.frameId
-            ? { ...f, sprites: [...f.sprites, ...spritesToCopy] }
+            ? { ...f, sprites: [...f.sprites, ...structuredClone(spritesToCopy)] }
             : f,
         );
         return {
@@ -840,12 +840,13 @@ export const frames = (
         sprites = sprites.filter((s) => s.id !== sprite.id);
         sprites.unshift(sprite);
       }
+      const updatedFrame = { ...state.currentFrame, sprites };
       return {
         ...state,
-        currentFrame: {
-          ...state.currentFrame,
-          sprites,
-        },
+        currentFrame: updatedFrame,
+        frames: state.frames.map((f) =>
+          f.id === updatedFrame.id ? updatedFrame : f,
+        ),
       };
     }
     case Actions.BRING_SPRITE_TO_FRONT: {
@@ -854,12 +855,13 @@ export const frames = (
         sprites = sprites.filter((s) => s.id !== sprite.id);
         sprites.push(sprite);
       }
+      const updatedFrame = { ...state.currentFrame, sprites };
       return {
         ...state,
-        currentFrame: {
-          ...state.currentFrame,
-          sprites,
-        },
+        currentFrame: updatedFrame,
+        frames: state.frames.map((f) =>
+          f.id === updatedFrame.id ? updatedFrame : f,
+        ),
       };
     }
     case Actions.SET_CURRENT_FRAME_BACKGROUND: {

@@ -80,26 +80,33 @@ export default function ExportVideo({
     layer.add(background);
     background.moveToBottom();
 
-    for (const s of sprites) {
-      const img = new window.Image();
-      img.crossOrigin = "anonymous";
-      img.src = resolveSpriteUrl(s.backgroundUrl);
-
-      console.log("Rendering sprite", s.id, s);
-
-      const sprite = new Konva.Image({
-        x: s.position.x,
-        y: s.position.y,
-        image: img,
-        width: s.width,
-        height: s.height,
-        rotation: s.rotation,
-        offsetX: s.width / 2,
-        offsetY: s.height / 2,
-        opacity: s.opacity ?? 1,
-      });
-      layer.add(sprite);
-    }
+    await Promise.all(
+      sprites.map(
+        (s) =>
+          new Promise<void>((resolve) => {
+            const img = new window.Image();
+            img.crossOrigin = "anonymous";
+            img.onload = () => {
+              layer.add(
+                new Konva.Image({
+                  x: s.position.x,
+                  y: s.position.y,
+                  image: img,
+                  width: s.width,
+                  height: s.height,
+                  rotation: s.rotation,
+                  offsetX: s.width / 2,
+                  offsetY: s.height / 2,
+                  opacity: s.opacity ?? 1,
+                }),
+              );
+              resolve();
+            };
+            img.onerror = () => resolve();
+            img.src = resolveSpriteUrl(s.backgroundUrl);
+          }),
+      ),
+    );
 
     stage.draw();
     const canvas = stage.toCanvas({ pixelRatio: 2 });

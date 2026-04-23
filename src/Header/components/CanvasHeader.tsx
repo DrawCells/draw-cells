@@ -5,6 +5,7 @@ import {
   AppBar,
   Box,
   Button,
+  CircularProgress,
   IconButton,
   TextField,
   Toolbar,
@@ -16,7 +17,7 @@ import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useParams, useRouter } from "next/navigation";
 import { db } from "../../firebase-config";
-import { recomputeFrames, updatePresentationTitle } from "../../Frames/actions";
+import { updatePresentationTitle } from "../../Frames/actions";
 import { toggleModal } from "../../Presentation/actions";
 import State from "../../stateInterface";
 import ExportVideo from "./ExportVideo";
@@ -30,7 +31,7 @@ const CanvasHeader = () => {
   const router = useRouter();
   const presentationTitle = useSelector((state: State) => state.frames.title);
   const isFramesSaving = useSelector(
-    (state: State) => state.frames.isFramesSaving
+    (state: State) => state.frames.isFramesSaving,
   );
   const [isTitleEditing, setIsTitleEditing] = useState(false);
   const [currentTitle, setCurrentTitle] = useState(presentationTitle);
@@ -59,6 +60,11 @@ const CanvasHeader = () => {
         }}
       >
         <Box style={{ flexGrow: 1, display: "flex" }} alignItems="center">
+          <img
+            src="/assets/logo/scillustrate-logo-white-no-padding.png"
+            alt="Scillustrate"
+            style={{ height: 24, marginBottom: 9, marginRight: 16 }}
+          />
           {isTitleEditing && (
             <>
               <TextField
@@ -87,7 +93,7 @@ const CanvasHeader = () => {
           )}
           {!isTitleEditing && (
             <>
-              <Typography variant="h6">{presentationTitle}</Typography>
+              <Typography>{presentationTitle}</Typography>
               <IconButton
                 component="span"
                 size="small"
@@ -98,27 +104,35 @@ const CanvasHeader = () => {
               </IconButton>
             </>
           )}
-          <Typography variant="body2" sx={{ ml: 3 }}>
-            {isFramesSaving ? "Saving..." : "Up to date"}
-          </Typography>
+          {isFramesSaving && (
+            <CircularProgress size={16} sx={{ ml: 2, color: "white" }} />
+          )}
         </Box>
-        <Button color="inherit" onClick={() => router.push("/")}>
-          HOME
+        <Button
+          color="inherit"
+          onClick={() => router.push("/")}
+          sx={{ "&:hover": { bgcolor: "rgba(255,255,255,0.1)" } }}
+        >
+          Home
         </Button>
-        <Button color="inherit" onClick={() => dispatch(toggleModal(true))}>
-          PREVIEW
+        <Button
+          color="inherit"
+          onClick={() => dispatch(toggleModal(true))}
+          sx={{ "&:hover": { bgcolor: "rgba(255,255,255,0.1)" } }}
+        >
+          Preview
         </Button>
-        <Button color="inherit" onClick={() => dispatch(recomputeFrames())}>
-          {" "}
-          Recompute Frames{" "}
-        </Button>
+        {/* <Button color="inherit" onClick={() => dispatch(recomputeFrames())}>
+          Recompute Frames
+        </Button> */}
         <Button
           color="inherit"
           onClick={() => {
             navigator.clipboard.writeText(
-              `${window.location.origin}/presentations/${presentationId}/present`
+              `${window.location.origin}/presentations/${presentationId}/present`,
             );
           }}
+          sx={{ "&:hover": { bgcolor: "rgba(255,255,255,0.1)" } }}
         >
           Get presentation link
         </Button>

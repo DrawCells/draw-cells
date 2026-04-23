@@ -2,15 +2,7 @@
 
 import AccountCircle from "@mui/icons-material/AccountCircle";
 import ArrowDropDown from "@mui/icons-material/ArrowDropDown";
-import {
-  AppBar,
-  Button,
-  Menu,
-  MenuItem,
-  Stack,
-  Toolbar,
-  Typography,
-} from "@mui/material";
+import { AppBar, Button, Menu, MenuItem, Stack, Toolbar } from "@mui/material";
 import React, { useEffect, useState, useTransition } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import State from "../../stateInterface";
@@ -55,12 +47,28 @@ const HomeHeader = () => {
   if (!hasMounted) return null;
 
   return (
-    <AppBar position="static" style={{ zIndex: 25 }}>
+    <AppBar
+      position="static"
+      style={{ zIndex: 25, backgroundColor: "rgb(21, 62, 49)" }}
+    >
       <Toolbar sx={{ pl: 7, pr: 7 }}>
         <Stack direction="row" style={{ flexGrow: 1 }} alignItems="center">
-          <Typography variant="h6">Draw Cells</Typography>
+          <img
+            src="/assets/logo/scillustrate-logo-white-no-padding.png"
+            alt="Scillustrate"
+            style={{
+              height: 32,
+              marginBottom: 9,
+              marginRight: 24,
+            }}
+          />
           {user && (
-            <Button color="inherit" onClick={handleNewPresentation}>
+            <Button
+              variant="contained"
+              color="secondary"
+              onClick={handleNewPresentation}
+              style={{ fontWeight: "bolder" }}
+            >
               New Presentation
             </Button>
           )}
