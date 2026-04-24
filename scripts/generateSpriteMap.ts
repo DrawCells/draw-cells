@@ -17,11 +17,12 @@ const CSV_FILE = path.join(
 const CONSTANTS_FILE = path.resolve("src/constants.tsx");
 
 // These top-level folders are skipped entirely
-const SKIP_FOLDERS = new Set(["Old Cells"]);
+const SKIP_FOLDERS = new Set<string>();
 
 // Maps top-level folder names to display category names.
 // Key must match the actual folder name on disk (including any trailing spaces).
 const FOLDER_TO_CATEGORY: Record<string, string> = {
+  Backgrounds: "Backgrounds",
   Brain: "Brain",
   "Cancer cells ": "Cancer Cells", // trailing space in actual folder name
   "DNA and RNA": "DNA and RNA",
@@ -29,7 +30,11 @@ const FOLDER_TO_CATEGORY: Record<string, string> = {
   "Ioana_s illustrations": "Molecules",
   "Lab animals": "Lab Animals",
   "Lab icons": "Lab Icons",
+  "Laboratory Instruments": "Laboratory Instruments",
+  "Laboratory materials": "Laboratory Materials",
+  "Membrane receptors": "Membrane Receptors",
   Organs: "Organs",
+  Pathogens: "Pathogens",
   "Structural cells": "Structural Cells",
 };
 
@@ -48,6 +53,18 @@ const FILE_TO_CSV_OVERRIDES: Record<string, string> = {
   "B cell receptor (IgA, dimer)": "Immunoglobulin (IgA, dimer)",
   // "T cell receptor - purple" parsed as baseName "T cell receptor"; map to simple groove
   "T cell receptor": "T cell receptor (simple groove)",
+  // Files use _ instead of . for the decimal point (filesystem-safe naming)
+  "1_.5ml tube (empty, open)": "1.5ml tube (empty, open)",
+  "1_.5ml tube (empty)": "1.5ml tube (empty)",
+  "1_.5ml tube (sample)": "1.5ml tube (sample)",
+  // Files use _ instead of . in E_.coli
+  "E_.coli (2D)": "E.coli (2D)",
+  "E_.coli (3D)": "E.coli (3D)",
+  // Files are named PD-1 / PD-L1; CSV uses full "Immune receptor (...)" names
+  "PD-1": "Immune receptor (PD-1)",
+  "PD-L1": "Immune receptor (PD-L1)",
+  // CSV has a typo ("circluar"); file name is correct ("circular")
+  "Cell membrane (circular)": "Cell membrane (circluar)",
 };
 
 // ---------------------------------------------------------------------------
@@ -153,9 +170,8 @@ function collectSVGs(dir: string, category: string, out: SpriteFile[]) {
     const withoutExt = entry.slice(0, -4); // strip .svg
 
     // Detect " - color" suffix: look for " - " or "- " followed by a lowercase
-    // color word at the end of the string. Handles both "Name - color" and
-    // the occasional malformed "Name- color" (missing leading space).
-    const variantMatch = withoutExt.match(/^(.+?) ?- ([a-z]+)$/);
+    // color word (or compound "color_color") at the end of the string.
+    const variantMatch = withoutExt.match(/^(.+?) ?- ([a-z]+(?:_[a-z]+)*)$/);
 
     let baseName: string;
     let variant: string | null;
@@ -164,7 +180,8 @@ function collectSVGs(dir: string, category: string, out: SpriteFile[]) {
       baseName = variantMatch[1];
       variant = variantMatch[2];
     } else {
-      baseName = withoutExt;
+      // Strip any trailing " - " separator left by malformed filenames (e.g. "PD-L1 - .svg")
+      baseName = withoutExt.replace(/ ?-\s*$/, "").trim();
       variant = null;
     }
 
