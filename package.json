@@ -45,7 +45,8 @@
     "dev": "PORT=3002 next dev",
     "build": "next build",
     "start": "next start",
-    "upload:sprites": "tsx scripts/uploadSpritesToDb.ts"
+    "upload:sprites": "tsx scripts/uploadSpritesToDb.ts",
+    "generate:sprite-map": "tsx scripts/generateSpriteMap.ts"
   },
   "eslintConfig": {
     "extends": [
