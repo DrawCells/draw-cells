@@ -11,13 +11,19 @@ type SpriteEntry = {
   category: string;
 };
 
+// Firebase Realtime Database keys cannot contain ".", "#", "$", "/", "[", or "]"
+function toFirebaseKey(name: string): string {
+  return name.replace(/\./g, "_");
+}
+
 const sprites: Record<string, SpriteEntry> = {};
 
 Object.entries(SPRITES_BY_CATEGORY_TO_SVG_ELEMENT_MAP).forEach(
   ([category, cells]) => {
     Object.entries(cells).forEach(([key, value]) => {
       const name = value.name || key;
-      sprites[name] = {
+      const firebaseKey = toFirebaseKey(name);
+      sprites[firebaseKey] = {
         name,
         tags: value.tags || [],
         variants: value.variants || [],

@@ -53,13 +53,6 @@ const FILE_TO_CSV_OVERRIDES: Record<string, string> = {
   "B cell receptor (IgA, dimer)": "Immunoglobulin (IgA, dimer)",
   // "T cell receptor - purple" parsed as baseName "T cell receptor"; map to simple groove
   "T cell receptor": "T cell receptor (simple groove)",
-  // Files use _ instead of . for the decimal point (filesystem-safe naming)
-  "1_.5ml tube (empty, open)": "1.5ml tube (empty, open)",
-  "1_.5ml tube (empty)": "1.5ml tube (empty)",
-  "1_.5ml tube (sample)": "1.5ml tube (sample)",
-  // Files use _ instead of . in E_.coli
-  "E_.coli (2D)": "E.coli (2D)",
-  "E_.coli (3D)": "E.coli (3D)",
   // Files are named PD-1 / PD-L1; CSV uses full "Immune receptor (...)" names
   "PD-1": "Immune receptor (PD-1)",
   "PD-L1": "Immune receptor (PD-L1)",
@@ -184,6 +177,7 @@ function collectSVGs(dir: string, category: string, out: SpriteFile[]) {
       baseName = withoutExt.replace(/ ?-\s*$/, "").trim();
       variant = null;
     }
+
 
     out.push({ category, baseName, variant });
   }

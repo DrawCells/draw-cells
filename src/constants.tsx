@@ -1205,8 +1205,8 @@ export const SPRITES_BY_CATEGORY_TO_SVG_ELEMENT_MAP = {
     },
   },
   "Laboratory Materials": {
-    "1_.5ml tube (empty, open)": {
-      name: "1_.5ml tube (empty, open)",
+    "1.5ml tube (empty, open)": {
+      name: "1.5ml tube (empty, open)",
       tags: [
         "1.5 ml",
         "biology",
@@ -1224,8 +1224,8 @@ export const SPRITES_BY_CATEGORY_TO_SVG_ELEMENT_MAP = {
         "tube",
       ],
     },
-    "1_.5ml tube (empty)": {
-      name: "1_.5ml tube (empty)",
+    "1.5ml tube (empty)": {
+      name: "1.5ml tube (empty)",
       tags: [
         "1.5 ml",
         "biology",
@@ -1243,8 +1243,8 @@ export const SPRITES_BY_CATEGORY_TO_SVG_ELEMENT_MAP = {
         "tube",
       ],
     },
-    "1_.5ml tube (sample)": {
-      name: "1_.5ml tube (sample)",
+    "1.5ml tube (sample)": {
+      name: "1.5ml tube (sample)",
       tags: [
         "1.5 ml",
         "biology",
@@ -3615,8 +3615,8 @@ export const SPRITES_BY_CATEGORY_TO_SVG_ELEMENT_MAP = {
       ],
       variants: ["blue", "green", "grey", "orange", "purple", "red", "yellow"],
     },
-    "E_.coli (2D)": {
-      name: "E_.coli (2D)",
+    "E.coli (2D)": {
+      name: "E.coli (2D)",
       tags: [
         "2D",
         "E. coli",
@@ -3639,8 +3639,8 @@ export const SPRITES_BY_CATEGORY_TO_SVG_ELEMENT_MAP = {
       ],
       variants: ["blue", "green", "grey", "orange", "purple", "red", "yellow"],
     },
-    "E_.coli (3D)": {
-      name: "E_.coli (3D)",
+    "E.coli (3D)": {
+      name: "E.coli (3D)",
       tags: [
         "3D",
         "E. coli",
