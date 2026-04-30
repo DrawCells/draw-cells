@@ -29,13 +29,13 @@ function extractStoragePath(url: string): string | null {
     !url.startsWith("gs:") &&
     !url.startsWith("/")
   ) {
-    return url;
+    return decodeURIComponent(url);
   }
   try {
     const parsed = new URL(url);
     if (parsed.hostname === "storage.googleapis.com") {
       const parts = parsed.pathname.split("/").filter(Boolean);
-      return parts.slice(1).join("/");
+      return decodeURIComponent(parts.slice(1).join("/"));
     }
   } catch {}
   return null;
