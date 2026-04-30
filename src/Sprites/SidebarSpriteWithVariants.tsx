@@ -91,6 +91,7 @@ export default function SidebarSpriteWithVariants({
       <SidebarSprite
         name={name}
         backgroundUrl={previewImageUrl}
+        storagePath={basePath ? `${basePath}.svg` : undefined}
         onDragStart={handleVariantDragStart}
       />
     );
@@ -184,11 +185,17 @@ export default function SidebarSpriteWithVariants({
           {variantList.map((variant, index) => {
             const label = variant || "Default";
             const url = variant ? variantUrls[variant] : "";
+            const variantStoragePath = variant
+              ? `${basePath} - ${variant}.svg`
+              : basePath
+                ? `${basePath}.svg`
+                : undefined;
             return (
               <SidebarSprite
                 key={`variant-${index}-${label}`}
                 name={name}
                 backgroundUrl={url}
+                storagePath={variantStoragePath}
                 onDragStart={handleVariantDragStart}
               />
             );

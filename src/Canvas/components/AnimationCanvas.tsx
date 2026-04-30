@@ -258,7 +258,7 @@ function AnimationCanvas() {
               offsetY +
               scrollContainerRef.current.scrollTop,
           },
-          item.backgroundUrl,
+          item.storagePath || item.backgroundUrl,
           item.ratio,
         );
       }

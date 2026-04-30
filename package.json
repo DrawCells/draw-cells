@@ -46,7 +46,8 @@
     "build": "next build",
     "start": "next start",
     "upload:sprites": "tsx scripts/uploadSpritesToDb.ts",
-    "generate:sprite-map": "tsx scripts/generateSpriteMap.ts"
+    "generate:sprite-map": "tsx scripts/generateSpriteMap.ts",
+    "migrate:signed-urls": "tsx scripts/migrateSignedUrlsToStoragePaths.ts"
   },
   "eslintConfig": {
     "extends": [

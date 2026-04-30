@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { resolveSpriteUrl } from "../helpers";
+import { resolveImageUrl } from "../helpers";
 import { Image } from "react-konva";
 
 const CanvasSprite = React.forwardRef(
@@ -14,11 +14,16 @@ const CanvasSprite = React.forwardRef(
         return;
       }
 
-      const img = new window.Image();
-      img.crossOrigin = "anonymous";
-      img.src = resolveSpriteUrl(shapeProps.backgroundUrl);
-      img.onload = () => setImage(img);
-      img.onerror = (err) => console.error("Error loading image", err);
+      let cancelled = false;
+      resolveImageUrl(shapeProps.backgroundUrl).then((src) => {
+        if (cancelled || !src) return;
+        const img = new window.Image();
+        img.crossOrigin = "anonymous";
+        img.src = src;
+        img.onload = () => { if (!cancelled) setImage(img); };
+        img.onerror = (err) => console.error("Error loading image", err);
+      });
+      return () => { cancelled = true; };
     }, [shapeProps.backgroundUrl]);
 
     if (!image) {

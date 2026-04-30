@@ -7,12 +7,14 @@ import { resolveSpriteUrl } from "../helpers";
 interface SidebarSpriteProps {
   backgroundUrl: string;
   name: string;
+  storagePath?: string;
   onDragStart?: () => void;
 }
 
 export default function SidebarSprite({
   backgroundUrl,
   name,
+  storagePath,
   onDragStart,
 }: SidebarSpriteProps) {
   const [ratio, setRatio] = useState(1);
@@ -23,6 +25,7 @@ export default function SidebarSprite({
       item: {
         type: "SIDEBAR_SPRITE",
         backgroundUrl,
+        storagePath: storagePath || backgroundUrl,
         ratio,
         name,
       },
