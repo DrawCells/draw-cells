@@ -32,6 +32,7 @@ import PropertiesSidebar from "../../Sidebars/components/PropertiesSidebar";
 import SpritesSidebar from "../../Sidebars/components/SpritesSidebar";
 import CanvasSprite from "../../Sprites/CanvasSprite";
 import State from "../../stateInterface";
+import { resolveImageUrl } from "../../helpers";
 import { zoomIn, zoomOut } from "../actions";
 import AnimationCanvasPreview from "./AnimationCanvasPreview";
 import ContextMenu from "./ContextMenu";
@@ -151,18 +152,23 @@ function AnimationCanvas() {
 
   // Get bg from db
   useEffect(() => {
-    if (currentFrameBgUrl) {
+    if (!currentFrameBgUrl) return;
+    let cancelled = false;
+    resolveImageUrl(currentFrameBgUrl).then((src) => {
+      if (cancelled || !src) return;
       const img = new Image();
       img.crossOrigin = "anonymous";
-      img.src = currentFrameBgUrl;
+      img.src = src;
       img.onload = () => {
+        if (cancelled) return;
         viewportRef.current.fillPatternImage(img);
         viewportRef.current.fillPatternScale({
           x: VIEWPORT_WIDTH / img.width,
           y: VIEWPORT_HEIGHT / img.height,
         });
       };
-    }
+    });
+    return () => { cancelled = true; };
   }, [currentFrameBgUrl]);
 
   // SAVE FRAME PREVIEW

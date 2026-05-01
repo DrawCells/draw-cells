@@ -34,27 +34,29 @@ export async function GET(req: NextRequest) {
         autoPaginate: false,
       });
 
-      const urls = await Promise.all(
-        files.map(async (file) => {
-          try {
-            const [url] = await file.getSignedUrl({
-              action: "read",
-              expires: Date.now() + 60 * 60 * 1000,
-            });
-            return url;
-          } catch {
-            return "";
-          }
-        }),
+      const files2 = await Promise.all(
+        files
+          .filter((file) => !file.name.endsWith("/"))
+          .map(async (file) => {
+            try {
+              const [url] = await file.getSignedUrl({
+                action: "read",
+                expires: Date.now() + 60 * 60 * 1000,
+              });
+              return { path: file.name, url };
+            } catch {
+              return null;
+            }
+          }),
       );
 
       return NextResponse.json({
-        urls: urls.filter(Boolean),
+        files: files2.filter(Boolean),
         nextPageToken: (apiResponse as any)?.nextPageToken || null,
       });
     } catch (error) {
       console.error("Failed to list files", error);
-      return NextResponse.json({ urls: [], nextPageToken: null });
+      return NextResponse.json({ files: [], nextPageToken: null });
     }
   }
 

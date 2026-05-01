@@ -50,7 +50,7 @@ function BackgroundsSection() {
       pageTokens.current?.push(data.nextPageToken);
       dispatch(
         loadBackgrounds({
-          backgrounds: data.urls || [],
+          backgrounds: data.files || [],
           hasEnded: !data.nextPageToken,
         }),
       );
@@ -63,8 +63,8 @@ function BackgroundsSection() {
     setPage(page + 1);
   };
 
-  const handleFrameBackground = (background: string) => {
-    dispatch(setCurrentFrameBackground(background));
+  const handleFrameBackground = (path: string) => {
+    dispatch(setCurrentFrameBackground(path));
   };
 
   return (
@@ -102,14 +102,14 @@ function BackgroundsSection() {
           {backgrounds?.list?.map((bg: any, index: number) => (
             <div
               key={`bg-image-${index}`}
-              onClick={() => handleFrameBackground(bg)}
+              onClick={() => handleFrameBackground(bg.path)}
               style={{
                 width: "100px",
                 display: "flex",
                 justifyContent: "center",
               }}
             >
-              <img src={bg} alt={bg} style={{ width: "90%" }} />
+              <img src={bg.url} alt={bg.path} style={{ width: "90%" }} />
             </div>
           ))}
         </Box>

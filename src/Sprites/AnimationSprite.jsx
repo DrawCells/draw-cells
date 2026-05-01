@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
 import { animated, to, useSpring } from "@react-spring/konva";
-import { resolveSpriteUrl } from "../helpers";
+import { resolveImageUrl } from "../helpers";
 
 function getCurrentAndPrevSprite(animationProps) {
   const { prevFrame, id } = animationProps;
@@ -162,10 +162,17 @@ export default function AnimationSprite(props) {
   const [img, setImg] = React.useState(null);
 
   useEffect(() => {
-    const newImg = new window.Image();
-    newImg.crossOrigin = "anonymous";
-    newImg.src = resolveSpriteUrl(backgroundUrl);
-    newImg.onload = () => setImg(newImg);
+    if (!backgroundUrl) return;
+    let cancelled = false;
+    resolveImageUrl(backgroundUrl).then((src) => {
+      if (cancelled || !src) return;
+      const newImg = new window.Image();
+      newImg.crossOrigin = "anonymous";
+      newImg.src = src;
+      newImg.onload = () => { if (!cancelled) setImg(newImg); };
+      newImg.onerror = (err) => console.error("Error loading image", err);
+    });
+    return () => { cancelled = true; };
   }, [backgroundUrl]);
 
   return (
