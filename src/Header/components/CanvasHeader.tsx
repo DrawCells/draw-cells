@@ -1,6 +1,8 @@
 import Close from "@mui/icons-material/Close";
 import Edit from "@mui/icons-material/Edit";
 import Save from "@mui/icons-material/Save";
+import Undo from "@mui/icons-material/Undo";
+import Redo from "@mui/icons-material/Redo";
 import {
   AppBar,
   Box,
@@ -9,6 +11,7 @@ import {
   IconButton,
   TextField,
   Toolbar,
+  Tooltip,
   Typography,
   useTheme,
 } from "@mui/material";
@@ -17,7 +20,7 @@ import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useParams, useRouter } from "next/navigation";
 import { db } from "../../firebase-config";
-import { updatePresentationTitle } from "../../Frames/actions";
+import { updatePresentationTitle, undo, redo } from "../../Frames/actions";
 import { toggleModal } from "../../Presentation/actions";
 import State from "../../stateInterface";
 import ExportVideo from "./ExportVideo";
@@ -37,10 +40,29 @@ const CanvasHeader = () => {
   const [currentTitle, setCurrentTitle] = useState(presentationTitle);
   const user = useSelector((state: State) => state.home.user);
   const { id: presentationId } = useParams<{ id: string }>();
+  const canUndo = useSelector((state: State) => state.frames._past.length > 0);
+  const canRedo = useSelector((state: State) => state.frames._future.length > 0);
 
   useEffect(() => {
     setCurrentTitle(presentationTitle);
   }, [presentationTitle]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      const isMac = navigator.platform.toUpperCase().includes("MAC");
+      const modifier = isMac ? e.metaKey : e.ctrlKey;
+      if (modifier && e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        dispatch(undo());
+      } else if (modifier && (e.key === "y" || (e.key === "z" && e.shiftKey))) {
+        e.preventDefault();
+        dispatch(redo());
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [dispatch]);
 
   const handleSave = async () => {
     await update(ref(db), {
@@ -108,6 +130,32 @@ const CanvasHeader = () => {
             <CircularProgress size={16} sx={{ ml: 2, color: "white" }} />
           )}
         </Box>
+        <Tooltip title="Undo (⌘Z)">
+          <span>
+            <IconButton
+              color="inherit"
+              onClick={() => dispatch(undo())}
+              disabled={!canUndo}
+              size="small"
+              sx={{ "&.Mui-disabled": { color: "rgba(255,255,255,0.5)" } }}
+            >
+              <Undo />
+            </IconButton>
+          </span>
+        </Tooltip>
+        <Tooltip title="Redo (⌘⇧Z)">
+          <span>
+            <IconButton
+              color="inherit"
+              onClick={() => dispatch(redo())}
+              disabled={!canRedo}
+              size="small"
+              sx={{ "&.Mui-disabled": { color: "rgba(255,255,255,0.5)" } }}
+            >
+              <Redo />
+            </IconButton>
+          </span>
+        </Tooltip>
         <Button
           color="inherit"
           onClick={() => router.push("/")}
