@@ -137,7 +137,7 @@ const CanvasHeader = () => {
               onClick={() => dispatch(undo())}
               disabled={!canUndo}
               size="small"
-              sx={{ opacity: canUndo ? 1 : 0.4 }}
+              sx={{ "&.Mui-disabled": { color: "rgba(255,255,255,0.5)" } }}
             >
               <Undo />
             </IconButton>
@@ -150,7 +150,7 @@ const CanvasHeader = () => {
               onClick={() => dispatch(redo())}
               disabled={!canRedo}
               size="small"
-              sx={{ opacity: canRedo ? 1 : 0.4 }}
+              sx={{ "&.Mui-disabled": { color: "rgba(255,255,255,0.5)" } }}
             >
               <Redo />
             </IconButton>
