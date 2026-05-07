@@ -49,7 +49,7 @@ export default function FramesSidebar() {
       title: `Frame ${newFrameId}`,
       sprites: structuredClone(currentFrame.sprites),
     };
-    dispatch(addFrame(newFrame));
+    dispatch(addFrame(newFrame, currentFrame.id));
     handleClose();
   };
 

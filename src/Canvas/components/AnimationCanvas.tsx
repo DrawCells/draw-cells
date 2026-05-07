@@ -186,7 +186,7 @@ function AnimationCanvas() {
       const dataUrl = await renderFrameToDataUrl(sprites);
       console.log("Data URL generated, dispatching setFramePreview");
       if (!cancelled) dispatch(setFramePreview(currentFrameId, dataUrl));
-    }, 3000);
+    }, 200);
 
     return () => {
       clearTimeout(t);

@@ -608,11 +608,18 @@ export const frames = (
       return { ...state };
     }
     case Actions.ADD_FRAME: {
+      const { frame, afterId } = payload;
+      let baseFrames: Array<Frame>;
+      if (afterId != null) {
+        const insertAt = state.frames.findIndex((f) => f.id === afterId);
+        baseFrames = [...state.frames];
+        baseFrames.splice(insertAt + 1, 0, frame);
+      } else {
+        baseFrames = [...state.frames, frame];
+      }
       const { frames: newFrames, currentFrame: newCurrentFrame } =
-        computeNewFrames([...state.frames, payload], payload);
-      const crtFrame =
-        state.frames.find((f) => f.id === payload) || initialState.frames[0];
-      const nextFrame = computeNextFrame(state.frames, crtFrame);
+        computeNewFrames(baseFrames, frame);
+      const nextFrame = computeNextFrame(newFrames, newCurrentFrame);
 
       return {
         ...state,

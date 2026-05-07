@@ -78,9 +78,9 @@ export const copySelectedSpriteSIntoFrame = (frameId: number | string) => ({
   payload: {frameId},
 })
 
-export const addFrame = (frame: Frame) => ({
+export const addFrame = (frame: Frame, afterId?: number | string | null) => ({
   type: Actions.ADD_FRAME,
-  payload: frame,
+  payload: { frame, afterId },
 })
 
 export const nextAnimationFrame = () => ({
