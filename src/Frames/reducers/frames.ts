@@ -16,6 +16,8 @@ const initialState: FramesState = {
   lastSpriteId: 1,
   title: "",
   isFramesSaving: false,
+  _past: [],
+  _future: [],
 };
 
 interface Action {
@@ -56,6 +58,14 @@ export interface Frame {
   backgroundUrl?: string | undefined;
 }
 
+interface FramesSnapshot {
+  frames: Array<Frame>;
+  currentFrame: Frame;
+  lastSpriteId: number;
+}
+
+const MAX_HISTORY = 50;
+
 export interface FramesState {
   frames: Array<Frame>;
   currentFrame: Frame;
@@ -65,6 +75,8 @@ export interface FramesState {
   lastSpriteId: number;
   title: string;
   isFramesSaving?: boolean;
+  _past: Array<FramesSnapshot>;
+  _future: Array<FramesSnapshot>;
 }
 
 const computeNextFrame = (
@@ -371,40 +383,101 @@ const computeNewFrames = (
 //   return newFrames
 // }
 
+const TRACKED_ACTIONS = new Set([
+  'ADD_SPRITE',
+  'UPDATE_ALL_SELECTED_SPRITES',
+  'UPDATE_SPRITE',
+  'UPDATE_SPRITE_FIELDS',
+  'REMOVE_CURRENT_SPRITES',
+  'REMOVE_CURRENT_SPRITES_FROM_ALL_FRAMES',
+  'COPY_SPRITE_INTO_FRAME',
+  'COPY_SELECTED_SPRITES_INTO_FRAME',
+  'ADD_FRAME',
+  'REMOVE_FRAME',
+  'UPDATE_CURRENT_SPRITE_POSITION',
+  'SEND_SPRITE_TO_BACK',
+  'BRING_SPRITE_TO_FRONT',
+  'SET_CURRENT_FRAME_BACKGROUND',
+]);
+
+const snapshot = (state: FramesState): FramesSnapshot => ({
+  frames: state.frames,
+  currentFrame: state.currentFrame,
+  lastSpriteId: state.lastSpriteId,
+});
+
+const restoreSnapshot = (state: FramesState, snap: FramesSnapshot): FramesState => {
+  const nextFrame = computeNextFrame(snap.frames, snap.currentFrame);
+  return {
+    ...state,
+    frames: snap.frames,
+    currentFrame: snap.currentFrame,
+    lastSpriteId: snap.lastSpriteId,
+    nextFrame,
+    currentSprites: [],
+  };
+};
+
 export const frames = (
   state: FramesState = initialState,
   action: Action,
 ): FramesState => {
   const { type, payload } = action;
-  switch (type) {
-    case Actions.SET_INITIAL_DATA: {
-      if (!payload.frames || payload.frames.length <= 0) {
-        return {
-          ...initialState,
-          title: payload.title,
-        };
-      }
-      const lastSpriteId = Math.max(
-        ...payload.frames.map((f: Frame) => {
-          if (!f.sprites) return 1;
-          return Math.max(...f.sprites.map((s) => parseInt(s.id.toString())));
-        }),
-      );
 
-      const nextFrame = computeNextFrame(payload.frames, payload.frames[0]);
+  if (type === Actions.UNDO) {
+    if (state._past.length === 0) return state;
+    const previous = state._past[state._past.length - 1];
+    const newPast = state._past.slice(0, -1);
+    return {
+      ...restoreSnapshot(state, previous),
+      _past: newPast,
+      _future: [snapshot(state), ...state._future],
+    };
+  }
 
-      return {
-        ...initialState,
-        title: payload.title,
-        frames: payload.frames,
-        lastSpriteId: lastSpriteId + 1,
-        currentFrame: {
-          ...payload.frames[0],
-          sprites: payload.frames[0].sprites || [],
-        },
-        nextFrame: nextFrame,
-      };
+  if (type === Actions.REDO) {
+    if (state._future.length === 0) return state;
+    const next = state._future[0];
+    const newFuture = state._future.slice(1);
+    return {
+      ...restoreSnapshot(state, next),
+      _past: [...state._past, snapshot(state)].slice(-MAX_HISTORY),
+      _future: newFuture,
+    };
+  }
+
+  if (type === Actions.SET_INITIAL_DATA) {
+    if (!payload.frames || payload.frames.length <= 0) {
+      return { ...initialState, title: payload.title };
     }
+    const lastSpriteId = Math.max(
+      ...payload.frames.map((f: Frame) => {
+        if (!f.sprites) return 1;
+        return Math.max(...f.sprites.map((s) => parseInt(s.id.toString())));
+      }),
+    );
+    const nextFrame = computeNextFrame(payload.frames, payload.frames[0]);
+    return {
+      ...initialState,
+      title: payload.title,
+      frames: payload.frames,
+      lastSpriteId: lastSpriteId + 1,
+      currentFrame: {
+        ...payload.frames[0],
+        sprites: payload.frames[0].sprites || [],
+      },
+      nextFrame: nextFrame,
+    };
+  }
+
+  const shouldTrack = TRACKED_ACTIONS.has(type);
+  const newPast = shouldTrack
+    ? [...state._past, snapshot(state)].slice(-MAX_HISTORY)
+    : state._past;
+  const newFuture = shouldTrack ? [] : state._future;
+
+  const result = ((): FramesState => {
+    switch (type) {
     case Actions.ADD_SPRITE: {
       console.log("Adding sprite with payload:", payload);
       const newSprite = {
@@ -516,6 +589,41 @@ export const frames = (
           ...newCurrentSprite,
           [payload.field]: payload.value,
         };
+      }
+
+      const newCurrentSprites = state.currentSprites.map((s) =>
+        s.id === payload.id ? newCurrentSprite : structuredClone(s),
+      );
+      const crtFrame = {
+        ...state.currentFrame,
+        sprites: state.currentFrame.sprites.map((s) =>
+          s.id === payload.id ? newCurrentSprite : structuredClone(s),
+        ),
+      };
+      const { frames: newFrames, currentFrame: newCurrentFrame } =
+        computeNewFrames(state.frames, crtFrame);
+      return {
+        ...state,
+        frames: newFrames,
+        currentFrame: newCurrentFrame,
+        currentSprites: newCurrentSprites,
+      };
+    }
+    case Actions.UPDATE_SPRITE_FIELDS: {
+      const currentSprite = state.currentSprites.find(
+        (s) => s.id.toString() === payload.id.toString(),
+      );
+      if (!currentSprite) return state;
+
+      let newCurrentSprite: Sprite = { ...currentSprite };
+      for (const [field, value] of Object.entries(payload.fields)) {
+        if (field === 'positionX') {
+          newCurrentSprite = { ...newCurrentSprite, position: { ...newCurrentSprite.position, x: value as number } };
+        } else if (field === 'positionY') {
+          newCurrentSprite = { ...newCurrentSprite, position: { ...newCurrentSprite.position, y: value as number } };
+        } else {
+          newCurrentSprite = { ...newCurrentSprite, [field]: value };
+        }
       }
 
       const newCurrentSprites = state.currentSprites.map((s) =>
@@ -879,5 +987,8 @@ export const frames = (
     }
     default:
       return state;
-  }
+    }
+  })();
+
+  return { ...result, _past: newPast, _future: newFuture };
 };
