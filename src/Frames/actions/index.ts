@@ -13,6 +13,7 @@ export const Actions = {
   PREV_FRAME: 'PREV_FRAME',
   UPDATE_ALL_SELECTED_SPRITES: 'UPDATE_ALL_SELECTED_SPRITES',
   UPDATE_SPRITE: 'UPDATE_SPRITE',
+  UPDATE_SPRITE_FIELDS: 'UPDATE_SPRITE_FIELDS',
   REMOVE_SPRITE: 'REMOVE_SPRITE',
   REMOVE_CURRENT_SPRITES: 'REMOVE_CURRENT_SPRITES',
   REMOVE_SPRITE_FROM_ALL_FRAMES: 'REMOVE_SPRITE_FROM_ALL_FRAMES',
@@ -27,6 +28,8 @@ export const Actions = {
   SEND_SPRITE_TO_BACK: 'SEND_SPRITE_TO_BACK',
   BRING_SPRITE_TO_FRONT: 'BRING_SPRITE_TO_FRONT',
   SET_CURRENT_FRAME_BACKGROUND: 'SET_CURRENT_FRAME_BACKGROUND',
+  UNDO: 'UNDO',
+  REDO: 'REDO',
 }
 
 export const loadInitialData = (payload: any) => ({
@@ -47,6 +50,11 @@ export const updateAllSelectedSprites = ({field, value}: any) => ({
 export const updateSprite = ({field, value, id}: any) => ({
   type: Actions.UPDATE_SPRITE,
   payload: {field, value, id},
+})
+
+export const updateSpriteFields = ({id, fields}: {id: number | string, fields: Record<string, any>}) => ({
+  type: Actions.UPDATE_SPRITE_FIELDS,
+  payload: {id, fields},
 })
 
 export const removeSprite = (id: number | string) => ({
@@ -156,4 +164,12 @@ export const recomputeFrames = () => ({
 export const setCurrentFrameBackground = (background: string) => ({
   type: Actions.SET_CURRENT_FRAME_BACKGROUND,
   payload: background,
+})
+
+export const undo = () => ({
+  type: Actions.UNDO,
+})
+
+export const redo = () => ({
+  type: Actions.REDO,
 })

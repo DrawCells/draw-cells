@@ -23,6 +23,7 @@ import {
   setIsFramesSaving,
   unselectAllSprites,
   updateSprite,
+  updateSpriteFields,
 } from "../../Frames/actions";
 import { Sprite } from "../../Frames/reducers/frames";
 import Header from "../../Header/components/CanvasHeader";
@@ -360,40 +361,21 @@ function AnimationCanvas() {
   const handleTransform = (e: any) => {
     const transformerNode = e.currentTarget;
     for (let n of transformerNode.nodes()) {
-      const commonDetails = { id: n.attrs.spriteId };
-
       const scaleX = n.scaleX();
       const scaleY = n.scaleY();
       n.scaleX(1);
       n.scaleY(1);
 
-      dispatch(
-        updateSprite({ field: "positionX", value: n.x(), ...commonDetails }),
-      );
-      dispatch(
-        updateSprite({ field: "positionY", value: n.y(), ...commonDetails }),
-      );
-      dispatch(
-        updateSprite({
-          field: "width",
-          value: Math.max(5, n.width() * scaleX),
-          ...commonDetails,
-        }),
-      );
-      dispatch(
-        updateSprite({
-          field: "height",
-          value: Math.max(5, n.height() * scaleY),
-          ...commonDetails,
-        }),
-      );
-      dispatch(
-        updateSprite({
-          field: "rotation",
-          value: n.rotation(),
-          ...commonDetails,
-        }),
-      );
+      dispatch(updateSpriteFields({
+        id: n.attrs.spriteId,
+        fields: {
+          positionX: n.x(),
+          positionY: n.y(),
+          width: Math.max(5, n.width() * scaleX),
+          height: Math.max(5, n.height() * scaleY),
+          rotation: n.rotation(),
+        },
+      }));
     }
   };
 
@@ -403,8 +385,13 @@ function AnimationCanvas() {
     const dx = node.x() - originalPos.x;
     const dy = node.y() - originalPos.y;
     for (const sel of selectedSprites) {
-      dispatch(updateSprite({ field: "positionX", value: sel.position.x + dx, id: sel.id }));
-      dispatch(updateSprite({ field: "positionY", value: sel.position.y + dy, id: sel.id }));
+      dispatch(updateSpriteFields({
+        id: sel.id,
+        fields: {
+          positionX: sel.position.x + dx,
+          positionY: sel.position.y + dy,
+        },
+      }));
     }
   };
 
