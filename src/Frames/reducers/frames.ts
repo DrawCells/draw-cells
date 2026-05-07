@@ -394,6 +394,7 @@ const TRACKED_ACTIONS = new Set([
   'COPY_SELECTED_SPRITES_INTO_FRAME',
   'ADD_FRAME',
   'REMOVE_FRAME',
+  'REORDER_FRAMES',
   'UPDATE_CURRENT_SPRITE_POSITION',
   'SEND_SPRITE_TO_BACK',
   'BRING_SPRITE_TO_FRONT',
@@ -716,11 +717,18 @@ export const frames = (
       return { ...state };
     }
     case Actions.ADD_FRAME: {
+      const { frame, afterId } = payload;
+      let baseFrames: Array<Frame>;
+      if (afterId != null) {
+        const insertAt = state.frames.findIndex((f) => f.id === afterId);
+        baseFrames = [...state.frames];
+        baseFrames.splice(insertAt + 1, 0, frame);
+      } else {
+        baseFrames = [...state.frames, frame];
+      }
       const { frames: newFrames, currentFrame: newCurrentFrame } =
-        computeNewFrames([...state.frames, payload], payload);
-      const crtFrame =
-        state.frames.find((f) => f.id === payload) || initialState.frames[0];
-      const nextFrame = computeNextFrame(state.frames, crtFrame);
+        computeNewFrames(baseFrames, frame);
+      const nextFrame = computeNextFrame(newFrames, newCurrentFrame);
 
       return {
         ...state,
@@ -937,9 +945,14 @@ export const frames = (
       const newFrames = state.frames.map((x) =>
         x.id === payload.frameId ? { ...x, preview: payload.preview } : x,
       );
+      const newCurrentFrame =
+        state.currentFrame.id === payload.frameId
+          ? { ...state.currentFrame, preview: payload.preview }
+          : state.currentFrame;
       return {
         ...state,
         frames: newFrames,
+        currentFrame: newCurrentFrame,
       };
     }
     case Actions.SEND_SPRITE_TO_BACK: {
@@ -983,6 +996,21 @@ export const frames = (
           backgroundUrl: payload,
         },
         frames: newFrames,
+      };
+    }
+    case Actions.REORDER_FRAMES: {
+      const { fromIndex, toIndex } = payload;
+      let newFrames = [...state.frames];
+      const [moved] = newFrames.splice(fromIndex, 1);
+      newFrames.splice(toIndex, 0, moved);
+      for (const f of newFrames) {
+        newFrames = computeNewFrames(newFrames, f).frames;
+      }
+      const newCurrentFrame = newFrames.find((f) => f.id === state.currentFrame.id) || state.currentFrame;
+      return {
+        ...state,
+        frames: newFrames,
+        currentFrame: newCurrentFrame,
       };
     }
     default:

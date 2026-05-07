@@ -6,7 +6,7 @@ import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH } from "../../constants";
 import { Sprite } from "../../Frames/reducers/frames";
 import Konva from "konva";
 import ArrowDropDown from "@mui/icons-material/ArrowDropDown";
-import { resolveImageUrl } from "../../helpers";
+import { renderFrameToDataUrl, resolveImageUrl } from "../../helpers";
 
 async function uploadImage(file: File, presentationId: string) {
   // Step 1: get a presigned URL
@@ -327,19 +327,15 @@ export default function ExportVideo({
   const handleExportFrame = async () => {
     setIsExporting(true);
     setAnchorEl(null);
-    const stage = createStage();
     try {
-      const blob: Blob = await renderSprites(stage, currentFrame.sprites);
-      const fileUrl = URL.createObjectURL(blob);
+      const dataUrl = await renderFrameToDataUrl(currentFrame.sprites);
       const link = document.createElement("a");
-      link.href = fileUrl;
+      link.href = dataUrl;
       link.download = "frame.png";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      URL.revokeObjectURL(fileUrl);
     } finally {
-      stage.destroy();
       setIsExporting(false);
     }
   };
