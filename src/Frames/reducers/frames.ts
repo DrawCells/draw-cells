@@ -829,9 +829,14 @@ export const frames = (
       const newFrames = state.frames.map((x) =>
         x.id === payload.frameId ? { ...x, preview: payload.preview } : x,
       );
+      const newCurrentFrame =
+        state.currentFrame.id === payload.frameId
+          ? { ...state.currentFrame, preview: payload.preview }
+          : state.currentFrame;
       return {
         ...state,
         frames: newFrames,
+        currentFrame: newCurrentFrame,
       };
     }
     case Actions.SEND_SPRITE_TO_BACK: {
@@ -875,6 +880,21 @@ export const frames = (
           backgroundUrl: payload,
         },
         frames: newFrames,
+      };
+    }
+    case Actions.REORDER_FRAMES: {
+      const { fromIndex, toIndex } = payload;
+      let newFrames = [...state.frames];
+      const [moved] = newFrames.splice(fromIndex, 1);
+      newFrames.splice(toIndex, 0, moved);
+      for (const f of newFrames) {
+        newFrames = computeNewFrames(newFrames, f).frames;
+      }
+      const newCurrentFrame = newFrames.find((f) => f.id === state.currentFrame.id) || state.currentFrame;
+      return {
+        ...state,
+        frames: newFrames,
+        currentFrame: newCurrentFrame,
       };
     }
     default:

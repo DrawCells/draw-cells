@@ -8,6 +8,7 @@ export const Actions = {
   ADD_SPRITE: 'ADD_SPRITE',
   ADD_FRAME: 'ADD_FRAME',
   REMOVE_FRAME: 'REMOVE_FRAME',
+  REORDER_FRAMES: 'REORDER_FRAMES',
   RECOMPUTE_FRAMES: 'RECOMPUTE_FRAMES',
   NEXT_FRAME: 'NEXT_FRAME',
   PREV_FRAME: 'PREV_FRAME',
@@ -156,4 +157,9 @@ export const recomputeFrames = () => ({
 export const setCurrentFrameBackground = (background: string) => ({
   type: Actions.SET_CURRENT_FRAME_BACKGROUND,
   payload: background,
+})
+
+export const reorderFrames = (fromIndex: number, toIndex: number) => ({
+  type: Actions.REORDER_FRAMES,
+  payload: { fromIndex, toIndex },
 })

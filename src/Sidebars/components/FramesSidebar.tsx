@@ -4,7 +4,7 @@ import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import React from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { addFrame } from "../../Frames/actions";
+import { addFrame, reorderFrames } from "../../Frames/actions";
 import Frame from "../../Frames/components/Frame";
 import State from "../../stateInterface";
 import { toggleFrames } from "../actions";
@@ -53,6 +53,10 @@ export default function FramesSidebar() {
     handleClose();
   };
 
+  const handleMoveFrame = (fromIndex: number, toIndex: number) => {
+    dispatch(reorderFrames(fromIndex, toIndex));
+  };
+
   const handleClick = (event: any) => {
     event.preventDefault();
     setState({
@@ -98,9 +102,9 @@ export default function FramesSidebar() {
             overflowX: "auto",
           }}
         >
-          {framesList.map((f) => (
+          {framesList.map((f, index) => (
             <ListItem key={`frame-${f.id}`} style={{ width: "100%" }}>
-              <Frame id={f.id} title={f.title} preview={f.preview} />
+              <Frame id={f.id} title={f.title} preview={f.preview} index={index} onMove={handleMoveFrame} />
             </ListItem>
           ))}
           <ListItem style={{ height: "100%" }}>

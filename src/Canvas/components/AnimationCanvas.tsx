@@ -32,7 +32,7 @@ import PropertiesSidebar from "../../Sidebars/components/PropertiesSidebar";
 import SpritesSidebar from "../../Sidebars/components/SpritesSidebar";
 import CanvasSprite from "../../Sprites/CanvasSprite";
 import State from "../../stateInterface";
-import { resolveImageUrl } from "../../helpers";
+import { renderFrameToDataUrl, resolveImageUrl } from "../../helpers";
 import { zoomIn, zoomOut } from "../actions";
 import AnimationCanvasPreview from "./AnimationCanvasPreview";
 import ContextMenu from "./ContextMenu";
@@ -168,27 +168,29 @@ function AnimationCanvas() {
         });
       };
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [currentFrameBgUrl]);
 
   // SAVE FRAME PREVIEW
   useEffect(() => {
+    console.log("Saving frame preview");
     if (isAnimationPreviewModalOpen) return;
+    let cancelled = false;
+    console.log("Start debounced preview save");
     const t = setTimeout(async () => {
-      if (!stageRef.current) return;
+      console.log("Debounced preview save triggered");
+      if (!currentFrameId) return;
+      console.log("Rendering frame to data URL");
+      const dataUrl = await renderFrameToDataUrl(sprites);
+      console.log("Data URL generated, dispatching setFramePreview");
+      if (!cancelled) dispatch(setFramePreview(currentFrameId, dataUrl));
+    }, 3000);
 
-      const viewportImg = await stageRef.current.toDataURL({
-        pixelRatio: 3,
-        x: VIEWPORT_WIDTH - OFFSET - 5,
-        y: VIEWPORT_HEIGHT - OFFSET / 2 + 30,
-        width: VIEWPORT_WIDTH,
-        height: VIEWPORT_HEIGHT,
-      });
-      if (currentFrameId)
-        dispatch(setFramePreview(currentFrameId, viewportImg));
-    }, 200);
     return () => {
       clearTimeout(t);
+      cancelled = true;
     };
   }, [sprites, currentFrameId, isAnimationPreviewModalOpen, dispatch]);
 
@@ -403,8 +405,20 @@ function AnimationCanvas() {
     const dx = node.x() - originalPos.x;
     const dy = node.y() - originalPos.y;
     for (const sel of selectedSprites) {
-      dispatch(updateSprite({ field: "positionX", value: sel.position.x + dx, id: sel.id }));
-      dispatch(updateSprite({ field: "positionY", value: sel.position.y + dy, id: sel.id }));
+      dispatch(
+        updateSprite({
+          field: "positionX",
+          value: sel.position.x + dx,
+          id: sel.id,
+        }),
+      );
+      dispatch(
+        updateSprite({
+          field: "positionY",
+          value: sel.position.y + dy,
+          id: sel.id,
+        }),
+      );
     }
   };
 
@@ -523,7 +537,9 @@ function AnimationCanvas() {
                             }}
                             ref={shapeRefs.current[s.id]}
                             spriteId={s.id}
-                            onMouseEnter={() => setCursor(isSelected ? "move" : "pointer")}
+                            onMouseEnter={() =>
+                              setCursor(isSelected ? "move" : "pointer")
+                            }
                             onMouseLeave={() => setCursor("default")}
                             offsetX={s.width / 2}
                             offsetY={s.height / 2}

@@ -1,3 +1,50 @@
+import Konva from "konva";
+import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH } from "./constants";
+import { Sprite } from "./Frames/reducers/frames";
+
+export async function renderFrameToDataUrl(sprites: Sprite[]): Promise<string> {
+  const container = document.createElement("div");
+  container.style.position = "fixed";
+  container.style.left = "-9999px";
+  container.style.top = "-9999px";
+  document.body.appendChild(container);
+  const stage = new Konva.Stage({ container, width: VIEWPORT_WIDTH, height: VIEWPORT_HEIGHT });
+  const layer = new Konva.Layer();
+  stage.add(layer);
+
+  const background = new Konva.Rect({ x: 0, y: 0, width: VIEWPORT_WIDTH, height: VIEWPORT_HEIGHT, fill: "white" });
+  layer.add(background);
+  background.moveToBottom();
+
+  await Promise.all(
+    sprites.map(async (s) => {
+      const src = await resolveImageUrl(s.backgroundUrl || "");
+      if (!src) return;
+      await new Promise<void>((resolve) => {
+        const img = new window.Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          layer.add(new Konva.Image({
+            x: s.position.x, y: s.position.y, image: img,
+            width: s.width, height: s.height, rotation: s.rotation,
+            offsetX: s.width / 2, offsetY: s.height / 2,
+            opacity: s.opacity ?? 1,
+          }));
+          resolve();
+        };
+        img.onerror = () => resolve();
+        img.src = src;
+      });
+    }),
+  );
+
+  stage.draw();
+  const dataUrl = stage.toDataURL({ pixelRatio: 2 });
+  stage.destroy();
+  container.remove();
+  return dataUrl;
+}
+
 export function getRndInteger(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min)) + min;
 }
