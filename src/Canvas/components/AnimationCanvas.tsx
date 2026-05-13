@@ -17,10 +17,12 @@ import { db } from "../../firebase-config";
 import {
   addCurrentSprite,
   addSprite,
+  groupSprites,
   loadInitialData,
   setCurrentSprite,
   setFramePreview,
   setIsFramesSaving,
+  ungroupSprites,
   unselectAllSprites,
   updateSprite,
   updateSpriteFields,
@@ -300,12 +302,37 @@ function AnimationCanvas() {
     );
   }, [dispatch, prevDelta]);
 
+  // GROUP / UNGROUP KEYBOARD SHORTCUTS
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.metaKey || e.ctrlKey) {
+        if (e.key === "g" && e.shiftKey) {
+          e.preventDefault();
+          dispatch(ungroupSprites());
+        } else if (e.key === "g") {
+          e.preventDefault();
+          dispatch(groupSprites());
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [dispatch]);
+
   // SPRITE SELECTION
   const handleSelectSprite = (e: any, id: number | string) => {
     if (e.evt.metaKey || e.evt.shiftKey || e.evt.ctrlKey) {
       dispatch(addCurrentSprite(id));
     } else {
-      dispatch(setCurrentSprite(id));
+      const sprite = sprites?.find((s: Sprite) => s.id.toString() === id.toString());
+      if (sprite?.groupId) {
+        const group = sprites?.filter((s: Sprite) => s.groupId === sprite.groupId) || [];
+        dispatch(setCurrentSprite(group[0].id));
+        for (let i = 1; i < group.length; i++) dispatch(addCurrentSprite(group[i].id));
+      } else {
+        dispatch(setCurrentSprite(id));
+      }
     }
   };
 
@@ -335,6 +362,65 @@ function AnimationCanvas() {
     scrollContainerRef.current.addEventListener("scroll", repositionStage);
     repositionStage();
   }, []);
+
+  // DRAG SELECT
+  const [selectionRect, setSelectionRect] = useState({ x: 0, y: 0, width: 0, height: 0, visible: false });
+  const selectionRectRef = useRef({ x: 0, y: 0, width: 0, height: 0, visible: false });
+  const isSelecting = useRef(false);
+  const startPos = useRef({ x: 0, y: 0 });
+  const didDragSelect = useRef(false);
+
+  const handleStageMouseDown = (e: any) => {
+    const emptySpace = e.target === e.target.getStage() || e.target === viewportRef.current;
+    if (!emptySpace) return;
+    const pos = stageRef.current.getRelativePointerPosition();
+    isSelecting.current = true;
+    startPos.current = pos;
+  };
+
+  const handleStageMouseMove = () => {
+    if (!isSelecting.current) return;
+    const pos = stageRef.current.getRelativePointerPosition();
+    const newRect = {
+      x: Math.min(pos.x, startPos.current.x),
+      y: Math.min(pos.y, startPos.current.y),
+      width: Math.abs(pos.x - startPos.current.x),
+      height: Math.abs(pos.y - startPos.current.y),
+      visible: true,
+    };
+    selectionRectRef.current = newRect;
+    setSelectionRect(newRect);
+  };
+
+  const handleStageMouseUp = () => {
+    if (!isSelecting.current) return;
+    isSelecting.current = false;
+    const sel = selectionRectRef.current;
+    if (!sel.visible) return;
+    didDragSelect.current = true;
+    selectionRectRef.current = { ...sel, visible: false };
+    setSelectionRect((prev) => ({ ...prev, visible: false }));
+    let selected: Sprite[] = sprites?.filter((s: Sprite) => {
+      const sl = s.position.x - s.width / 2;
+      const sr = s.position.x + s.width / 2;
+      const st = s.position.y - s.height / 2;
+      const sb = s.position.y + s.height / 2;
+      return sl < sel.x + sel.width && sr > sel.x && st < sel.y + sel.height && sb > sel.y;
+    }) || [];
+    // Expand to full groups for any sprite that belongs to a group
+    const hitGroupIds = new Set(selected.map((s) => s.groupId).filter(Boolean));
+    if (hitGroupIds.size > 0) {
+      const existingIds = new Set(selected.map((s) => s.id));
+      const extra = sprites?.filter((s: Sprite) => s.groupId && hitGroupIds.has(s.groupId) && !existingIds.has(s.id)) || [];
+      selected = [...selected, ...extra];
+    }
+    if (selected.length > 0) {
+      dispatch(setCurrentSprite(selected[0].id));
+      for (let i = 1; i < selected.length; i++) {
+        dispatch(addCurrentSprite(selected[i].id));
+      }
+    }
+  };
 
   // CONTEXT MENU
   const stageRef: any = useRef(null);
@@ -451,6 +537,10 @@ function AnimationCanvas() {
                   height={2 * VIEWPORT_HEIGHT + 2 * OFFSET}
                   ref={stageRef}
                   onClick={(e: any) => {
+                    if (didDragSelect.current) {
+                      didDragSelect.current = false;
+                      return;
+                    }
                     const emptySpace =
                       e.target === e.target.getStage() ||
                       e.target === viewportRef.current;
@@ -458,6 +548,9 @@ function AnimationCanvas() {
 
                     dispatch(unselectAllSprites());
                   }}
+                  onMouseDown={handleStageMouseDown}
+                  onMouseMove={handleStageMouseMove}
+                  onMouseUp={handleStageMouseUp}
                   onContextMenu={handleContextMenu}
                   scale={{ x: scale, y: scale }}
                   x={stagePosition.x}
@@ -528,6 +621,41 @@ function AnimationCanvas() {
                         </React.Fragment>
                       );
                     })}
+                    {[...new Set(selectedSprites.map((s) => s.groupId).filter(Boolean))].map((gid) => {
+                      const members = sprites?.filter((s: Sprite) => s.groupId === gid) || [];
+                      if (members.length === 0) return null;
+                      const pad = 8;
+                      const bx = Math.min(...members.map((s: Sprite) => s.position.x - s.width / 2)) - pad;
+                      const by = Math.min(...members.map((s: Sprite) => s.position.y - s.height / 2)) - pad;
+                      const bw = Math.max(...members.map((s: Sprite) => s.position.x + s.width / 2)) + pad - bx;
+                      const bh = Math.max(...members.map((s: Sprite) => s.position.y + s.height / 2)) + pad - by;
+                      return (
+                        <Rect
+                          key={`group-bbox-${gid}`}
+                          x={bx}
+                          y={by}
+                          width={bw}
+                          height={bh}
+                          stroke="rgba(0, 120, 255, 0.45)"
+                          strokeWidth={1 / scale}
+                          dash={[6 / scale, 3 / scale]}
+                          fill="transparent"
+                          listening={false}
+                        />
+                      );
+                    })}
+                    {selectionRect.visible && (
+                      <Rect
+                        x={selectionRect.x}
+                        y={selectionRect.y}
+                        width={selectionRect.width}
+                        height={selectionRect.height}
+                        fill="rgba(0, 161, 255, 0.1)"
+                        stroke="rgba(0, 161, 255, 0.8)"
+                        strokeWidth={1 / scale}
+                        listening={false}
+                      />
+                    )}
                     {selectedSprites.length > 0 && (
                       <Transformer
                         ref={trRef}

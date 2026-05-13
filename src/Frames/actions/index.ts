@@ -32,6 +32,8 @@ export const Actions = {
   SET_CURRENT_FRAME_BACKGROUND: "SET_CURRENT_FRAME_BACKGROUND",
   UNDO: "UNDO",
   REDO: "REDO",
+  GROUP_SPRITES: "GROUP_SPRITES",
+  UNGROUP_SPRITES: "UNGROUP_SPRITES",
 };
 
 export const loadInitialData = (payload: any) => ({
@@ -192,4 +194,12 @@ export const undo = () => ({
 
 export const redo = () => ({
   type: Actions.REDO,
+});
+
+export const groupSprites = () => ({
+  type: Actions.GROUP_SPRITES,
+});
+
+export const ungroupSprites = () => ({
+  type: Actions.UNGROUP_SPRITES,
 });
