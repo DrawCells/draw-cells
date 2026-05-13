@@ -48,6 +48,7 @@ export interface Sprite {
   width: number;
   height: number;
   rotation: number;
+  groupId?: string;
 }
 
 export interface Frame {
@@ -399,6 +400,8 @@ const TRACKED_ACTIONS = new Set([
   'SEND_SPRITE_TO_BACK',
   'BRING_SPRITE_TO_FRONT',
   'SET_CURRENT_FRAME_BACKGROUND',
+  'GROUP_SPRITES',
+  'UNGROUP_SPRITES',
 ]);
 
 const snapshot = (state: FramesState): FramesSnapshot => ({
@@ -820,6 +823,33 @@ export const frames = (
         ...state,
         currentSprites: [],
       };
+    case Actions.GROUP_SPRITES: {
+      if (state.currentSprites.length < 2) return state;
+      const groupId = `group_${Date.now()}`;
+      const ids = new Set(state.currentSprites.map((s) => s.id));
+      const applyGroup = (sprites: Sprite[]) =>
+        sprites.map((s) => (ids.has(s.id) ? { ...s, groupId } : s));
+      return {
+        ...state,
+        currentFrame: { ...state.currentFrame, sprites: applyGroup(state.currentFrame.sprites) },
+        frames: state.frames.map((f) => ({ ...f, sprites: applyGroup(f.sprites) })),
+        currentSprites: state.currentSprites.map((s) => ({ ...s, groupId })),
+      };
+    }
+    case Actions.UNGROUP_SPRITES: {
+      const groupIds = new Set(
+        state.currentSprites.map((s) => s.groupId).filter(Boolean) as string[],
+      );
+      if (groupIds.size === 0) return state;
+      const removeGroup = (sprites: Sprite[]) =>
+        sprites.map((s) => (s.groupId && groupIds.has(s.groupId) ? { ...s, groupId: undefined } : s));
+      return {
+        ...state,
+        currentFrame: { ...state.currentFrame, sprites: removeGroup(state.currentFrame.sprites) },
+        frames: state.frames.map((f) => ({ ...f, sprites: removeGroup(f.sprites) })),
+        currentSprites: state.currentSprites.map((s) => ({ ...s, groupId: undefined })),
+      };
+    }
     case Actions.UPDATE_CURRENT_SPRITE_POSITION: {
       const { id, deltaX, deltaY } = payload;
       const currentSpritesIds = state.currentSprites.map((x) => x.id);

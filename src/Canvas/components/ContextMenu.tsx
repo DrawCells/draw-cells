@@ -5,6 +5,8 @@ import {
   copySelectedSpriteSIntoFrame,
   sendSpriteToBack,
   bringSpriteToFront,
+  groupSprites,
+  ungroupSprites,
 } from "../../Frames/actions";
 import { Menu, MenuItem } from "@mui/material";
 import { useDispatch, useSelector } from "react-redux";
@@ -21,7 +23,11 @@ export default function ContextMenu({ menuState, setMenuState }: any) {
   };
   const dispatch = useDispatch();
   const framesList = useSelector((state: State) => state.frames.frames);
+  const currentSprites = useSelector((state: State) => state.frames.currentSprites);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+
+  const canGroup = currentSprites.length >= 2;
+  const canUngroup = currentSprites.some((s) => !!s.groupId);
 
   return (
     <>
@@ -53,6 +59,18 @@ export default function ContextMenu({ menuState, setMenuState }: any) {
         </MenuItem>
         <MenuItem onClick={() => dispatch(bringSpriteToFront())}>
           Bring to Front
+        </MenuItem>
+        <MenuItem
+          disabled={!canGroup}
+          onClick={() => { dispatch(groupSprites()); handleClose(); }}
+        >
+          Group (⌘G)
+        </MenuItem>
+        <MenuItem
+          disabled={!canUngroup}
+          onClick={() => { dispatch(ungroupSprites()); handleClose(); }}
+        >
+          Ungroup (⌘⇧G)
         </MenuItem>
       </Menu>
       <Menu open={!!anchorEl} anchorEl={anchorEl}>
