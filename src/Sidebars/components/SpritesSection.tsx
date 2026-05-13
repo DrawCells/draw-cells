@@ -6,9 +6,17 @@ import {
   TextField,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import { useEffect, useMemo, useRef, useState } from "react";
+import InfiniteScroll from "react-infinite-scroll-component";
+import { useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { get, ref } from "firebase/database";
+import {
+  get,
+  limitToFirst,
+  orderByKey,
+  query,
+  ref,
+  startAfter,
+} from "firebase/database";
 import { loadSprites } from "../actions";
 import State from "../../stateInterface";
 import { db } from "../../firebase-config";
@@ -23,88 +31,139 @@ interface SpriteInfo {
   variants?: string[];
 }
 
+const PAGE_SIZE = 10;
+
+async function resolveSpriteImageUrl(id: string, sprite: SpriteInfo): Promise<SpriteInfo> {
+  let imageUrl = sprite.baseImageUrl;
+  const firstVariant = sprite.variants?.[0];
+  if (firstVariant) imageUrl = `${sprite.baseImageUrl} - ${firstVariant}`;
+  if (imageUrl) {
+    try {
+      const res = await fetch(
+        `/api/storage?path=${encodeURIComponent(`${imageUrl}.svg`)}`,
+      );
+      const data = await res.json();
+      if (data.url) imageUrl = data.url;
+    } catch (error) {
+      console.error("Failed to load sprite URL", error);
+    }
+  }
+  return {
+    id,
+    name: sprite.name,
+    tags: Array.isArray(sprite.tags) ? sprite.tags : [],
+    baseImageUrl: sprite.baseImageUrl,
+    previewImageUrl: imageUrl,
+    variants: Array.isArray(sprite.variants) ? sprite.variants : [],
+  };
+}
+
 export default function SpritesSection() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const [searchResults, setSearchResults] = useState<SpriteInfo[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const dispatch = useDispatch();
   const sprites = useSelector((state: State) => state.sidebars.sprites);
   const isSpritesSidebarOpen = useSelector(
     (state: State) => state.sidebars.isSpritesOpen,
   );
-  const [isSpritesListLoading, setIsSpritesListLoading] = useState(false);
-  const hasLoadedSpritesRef = useRef(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const hasLoadedOnceRef = useRef(false);
+  const lastKeyRef = useRef<string | undefined>(undefined);
+  const searchIdRef = useRef(0);
+  const [page, setPage] = useState(0);
 
   useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 400);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // When a search term is active, fetch all sprites from the database and filter locally.
+  // Firebase RTDB doesn't support substring or multi-field queries, so client-side
+  // filtering is applied after fetching all records.
+  useEffect(() => {
+    if (!debouncedSearchTerm || !isSpritesSidebarOpen || !isExpanded) {
+      setSearchResults([]);
+      return;
+    }
+
+    const currentId = ++searchIdRef.current;
+    setIsSearching(true);
+
+    const runSearch = async () => {
+      const res = await get(ref(db, "sprites"));
+      const data = (res.val() || {}) as Record<string, SpriteInfo>;
+      const term = debouncedSearchTerm.toLowerCase();
+
+      const matching = Object.entries(data).filter(([, sprite]) => {
+        const nameMatch = sprite.name?.toLowerCase().includes(term);
+        const tagsMatch = (sprite.tags || []).some((tag) =>
+          tag.toLowerCase().includes(term),
+        );
+        return nameMatch || tagsMatch;
+      });
+
+      const list = await Promise.all(
+        matching.map(([id, sprite]) => resolveSpriteImageUrl(id, sprite)),
+      );
+
+      if (currentId !== searchIdRef.current) return;
+      setSearchResults(list);
+      setIsSearching(false);
+    };
+
+    runSearch();
+  }, [debouncedSearchTerm, isSpritesSidebarOpen, isExpanded]);
+
+  // Paginated fetch — only runs when there is no active search term.
+  useEffect(() => {
     if (
+      debouncedSearchTerm ||
       !isSpritesSidebarOpen ||
       !isExpanded ||
       sprites.hasEnded ||
-      hasLoadedSpritesRef.current
+      (hasLoadedOnceRef.current && page === 0)
     ) {
       return;
     }
 
     const getSprites = async () => {
-      hasLoadedSpritesRef.current = true;
-      setIsSpritesListLoading(true);
+      if (page === 0) hasLoadedOnceRef.current = true;
 
-      const res = await get(ref(db, "sprites"));
+      const spriteQuery = lastKeyRef.current
+        ? query(
+            ref(db, "sprites"),
+            orderByKey(),
+            startAfter(lastKeyRef.current),
+            limitToFirst(PAGE_SIZE),
+          )
+        : query(ref(db, "sprites"), orderByKey(), limitToFirst(PAGE_SIZE));
+
+      const res = await get(spriteQuery);
       const data = (res.val() || {}) as Record<string, SpriteInfo>;
+      const entries = Object.entries(data);
+
+      if (entries.length > 0) {
+        lastKeyRef.current = entries[entries.length - 1][0];
+      }
+
       const list = await Promise.all(
-        Object.entries(data).map(async ([id, sprite]) => {
-          let imageUrl = sprite.baseImageUrl;
-          const firstVariant =
-            sprite.variants && sprite.variants.length > 0
-              ? sprite.variants[0]
-              : undefined;
-          if (firstVariant) {
-            imageUrl = `${sprite.baseImageUrl} - ${firstVariant}`;
-          }
-          if (imageUrl) {
-            try {
-              const res = await fetch(
-                `/api/storage?path=${encodeURIComponent(`${imageUrl}.svg`)}`,
-              );
-              const data = await res.json();
-              if (data.url) imageUrl = data.url;
-            } catch (error) {
-              console.error("Failed to load sprite URL", error);
-            }
-          }
-          return {
-            id,
-            name: sprite.name,
-            tags: Array.isArray(sprite.tags) ? sprite.tags : [],
-            baseImageUrl: sprite.baseImageUrl,
-            previewImageUrl: imageUrl,
-            variants: Array.isArray(sprite.variants) ? sprite.variants : [],
-          };
-        }),
+        entries.map(([id, sprite]) => resolveSpriteImageUrl(id, sprite)),
       );
 
       dispatch(
-        loadSprites({
-          sprites: list,
-          hasEnded: true,
-        }),
+        loadSprites({ sprites: list, hasEnded: entries.length < PAGE_SIZE }),
       );
-      setIsSpritesListLoading(false);
     };
 
     getSprites();
-  }, [dispatch, isSpritesSidebarOpen, isExpanded, sprites.hasEnded]);
+  }, [dispatch, isSpritesSidebarOpen, isExpanded, sprites.hasEnded, page, debouncedSearchTerm]);
 
-  const filteredSprites = useMemo(() => {
-    return (sprites.list || []).filter((sprite: SpriteInfo) => {
-      const nameMatch = sprite.name
-        ?.toLowerCase()
-        .includes(searchTerm.toLowerCase());
-      const tagsMatch = (sprite.tags || []).some((tag) =>
-        tag.toLowerCase().includes(searchTerm.toLowerCase()),
-      );
-      return nameMatch || tagsMatch;
-    });
-  }, [searchTerm, sprites.list]);
+  const handleNext = () => setPage((prev) => prev + 1);
+
+  const displaySprites = debouncedSearchTerm ? searchResults : sprites.list;
+  const hasMore = !debouncedSearchTerm && !sprites.hasEnded;
 
   return (
     <Accordion
@@ -146,28 +205,37 @@ export default function SpritesSection() {
             }}
           />
         </Box>
-        <Box
-          sx={{
-            height: "100%",
-            width: "100%",
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            alignItems: "center",
-            maxHeight: "calc(50vh)",
-            overflowY: "auto",
-          }}
+        <InfiniteScroll
+          dataLength={displaySprites.length}
+          next={handleNext}
+          hasMore={hasMore}
+          loader={null}
+          height={400}
         >
-          {isSpritesListLoading ? <CircularProgress /> : null}
-          {filteredSprites.map((sprite, i) => (
-            <SidebarSpriteWithVariants
-              key={sprite.id ?? `sprite-${i}`}
-              name={sprite.name}
-              variants={sprite.variants}
-              previewImageUrl={sprite.previewImageUrl}
-              baseImageUrl={sprite.baseImageUrl}
-            />
-          ))}
-        </Box>
+          <Box
+            sx={{
+              width: "100%",
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              alignItems: "center",
+            }}
+          >
+            {displaySprites.map((sprite, i) => (
+              <SidebarSpriteWithVariants
+                key={sprite.id ?? `sprite-${i}`}
+                name={sprite.name}
+                variants={sprite.variants}
+                previewImageUrl={sprite.previewImageUrl}
+                baseImageUrl={sprite.baseImageUrl}
+              />
+            ))}
+          </Box>
+          {(isSearching || hasMore) && (
+            <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}>
+              <CircularProgress size={24} />
+            </Box>
+          )}
+        </InfiniteScroll>
       </Box>
     </Accordion>
   );

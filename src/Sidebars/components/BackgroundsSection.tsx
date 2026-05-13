@@ -86,7 +86,7 @@ function BackgroundsSection() {
         next={handleNext}
         hasMore={!backgrounds?.hasEnded}
         loader={<CircularProgress />}
-        height={500}
+        height={400}
       >
         <Box
           sx={{
