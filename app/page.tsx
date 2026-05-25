@@ -11,7 +11,14 @@ export default async function HomePage() {
   const snapshot = await db
     .ref(`/user-presentations/${user.uid}`)
     .once("value");
-  const presentations = snapshot.val() || {};
+  const all =
+    (snapshot.val() as Record<
+      string,
+      { title: string; previewImage?: string; deletedAt?: number }
+    > | null) || {};
+  const presentations = Object.fromEntries(
+    Object.entries(all).filter(([, val]) => !val?.deletedAt),
+  );
 
   return (
     <Suspense>

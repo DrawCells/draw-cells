@@ -7,6 +7,28 @@ export async function deletePresentation(presId: string) {
   const user = await getSessionUser();
   if (!user) return { success: false };
 
+  await db
+    .ref(`/user-presentations/${user.uid}/${presId}/deletedAt`)
+    .set(Date.now());
+
+  return { success: true };
+}
+
+export async function restorePresentation(presId: string) {
+  const user = await getSessionUser();
+  if (!user) return { success: false };
+
+  await db
+    .ref(`/user-presentations/${user.uid}/${presId}/deletedAt`)
+    .remove();
+
+  return { success: true };
+}
+
+export async function permanentlyDeletePresentation(presId: string) {
+  const user = await getSessionUser();
+  if (!user) return { success: false };
+
   await db.ref(`/presentations/${presId}`).remove();
   await db.ref(`/user-presentations/${user.uid}/${presId}`).remove();
 

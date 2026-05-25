@@ -19,6 +19,7 @@ import {
   createNewPresentation,
   deletePresentation as deletePresentationAction,
 } from "../../Header/actions";
+import ConfirmDialog from "./ConfirmDialog";
 
 interface User {
   uid: string;
@@ -37,6 +38,7 @@ export default function PresentationsList({
 }: PresentationsListProps) {
   const [presentations, setPresentations] =
     useState<Record<string, { title: string; previewImage?: string }>>(initialPresentations);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const router = useRouter();
 
   const handleNewPresentation = async () => {
@@ -50,13 +52,20 @@ export default function PresentationsList({
     });
   };
 
-  const handleDelete = async (presId: string) => {
+  const handleConfirmDelete = async () => {
+    if (!pendingDeleteId) return;
+    const presId = pendingDeleteId;
+    setPendingDeleteId(null);
     const res = await deletePresentationAction(presId);
     if (res.success) {
       const { [presId]: _, ...rest } = presentations;
       setPresentations(rest);
     }
   };
+
+  const pendingTitle = pendingDeleteId
+    ? presentations[pendingDeleteId]?.title
+    : "";
 
   return (
     <Container maxWidth={false} sx={{ mt: 3 }}>
@@ -96,7 +105,7 @@ export default function PresentationsList({
                     <Button
                       variant="outlined"
                       color="error"
-                      onClick={() => handleDelete(id)}
+                      onClick={() => setPendingDeleteId(id)}
                       startIcon={<DeleteIcon fontSize="small" />}
                     >
                       Delete
@@ -126,6 +135,14 @@ export default function PresentationsList({
           </Grid>
         </Grid>
       )}
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        title="Move to Trash?"
+        message={`"${pendingTitle}" will be moved to Trash. You can restore it within 30 days before it is permanently deleted.`}
+        confirmLabel="Move to Trash"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setPendingDeleteId(null)}
+      />
     </Container>
   );
 }

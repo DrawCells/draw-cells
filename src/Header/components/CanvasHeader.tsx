@@ -19,6 +19,7 @@ import { ref, update } from "firebase/database";
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { db } from "../../firebase-config";
 import { updatePresentationTitle, undo, redo } from "../../Frames/actions";
 import { toggleModal } from "../../Presentation/actions";
@@ -82,11 +83,13 @@ const CanvasHeader = () => {
         }}
       >
         <Box style={{ flexGrow: 1, display: "flex" }} alignItems="center">
-          <img
-            src="/assets/logo/scillustrate-logo-white-no-padding.png"
-            alt="Scillustrate"
-            style={{ height: 24, marginBottom: 9, marginRight: 16 }}
-          />
+          <Link href="/" style={{ display: "inline-flex", marginRight: 16 }}>
+            <img
+              src="/assets/logo/scillustrate-logo-white-no-padding.png"
+              alt="Scillustrate"
+              style={{ height: 24, marginBottom: 9 }}
+            />
+          </Link>
           {isTitleEditing && (
             <>
               <TextField
