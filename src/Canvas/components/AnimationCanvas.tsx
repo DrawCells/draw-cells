@@ -238,13 +238,20 @@ function AnimationCanvas() {
     ratio: number,
   ) {
     if (pos) {
+      // ratio = naturalWidth / naturalHeight. Pin the shorter side to a base
+      // size and let the longer side grow, so wide images get a wider width
+      // (rather than a tiny height) just as tall images get a taller height.
+      const BASE = 50;
+      const r = ratio || 1;
+      const width = r >= 1 ? BASE * r : BASE;
+      const height = r >= 1 ? BASE : BASE / r;
       dispatch(
         addSprite({
           id: lastSpriteId,
           position: pos,
           backgroundUrl,
-          height: 50 / ratio,
-          width: 50,
+          width,
+          height,
           rotation: 0,
         }),
       );
@@ -285,60 +292,31 @@ function AnimationCanvas() {
     );
   }
 
+  // Maps the current pointer position to canvas coordinates via the Konva
+  // stage, so a dropped item lands exactly under the cursor regardless of
+  // scroll, zoom, or stage offset.
+  function pointerToCanvas(monitor: any): XYCoord | null {
+    const stage = stageRef.current;
+    const client = monitor.getClientOffset();
+    if (!stage || !client) return null;
+    stage.setPointersPositions({ clientX: client.x, clientY: client.y });
+    return stage.getRelativePointerPosition();
+  }
+
   const [, drop] = useDrop({
     accept: "SPRITE",
     drop: (item: any, monitor) => {
       if (item.type === "SIDEBAR_ARROW") {
-        const offsetX =
-          (VIEWPORT_WIDTH / 2 + OFFSET + leftDrawerWidth - 60) * (1 / scale);
-        const offsetY =
-          (VIEWPORT_HEIGHT / 2 + OFFSET + smallDrawerWidth - 12) * (1 / scale);
-        createArrow({
-          x:
-            (monitor.getSourceClientOffset()?.x || 0) -
-            offsetX +
-            scrollContainerRef.current.scrollLeft,
-          y:
-            (monitor.getSourceClientOffset()?.y || 0) -
-            offsetY +
-            scrollContainerRef.current.scrollTop,
-        });
+        createArrow(pointerToCanvas(monitor));
         return;
       }
       if (item.type === "SIDEBAR_TEXT") {
-        const offsetX =
-          (VIEWPORT_WIDTH / 2 + OFFSET + leftDrawerWidth - 100) * (1 / scale);
-        const offsetY =
-          (VIEWPORT_HEIGHT / 2 + OFFSET + smallDrawerWidth - 25) * (1 / scale);
-        createText({
-          x:
-            (monitor.getSourceClientOffset()?.x || 0) -
-            offsetX +
-            scrollContainerRef.current.scrollLeft,
-          y:
-            (monitor.getSourceClientOffset()?.y || 0) -
-            offsetY +
-            scrollContainerRef.current.scrollTop,
-        });
+        createText(pointerToCanvas(monitor));
         return;
       }
       if (item.type === "SIDEBAR_SPRITE") {
-        console.log("Dropped item:", item);
-        const offsetX =
-          (VIEWPORT_WIDTH / 2 + OFFSET + leftDrawerWidth - 30) * (1 / scale);
-        const offsetY =
-          (VIEWPORT_HEIGHT / 2 + OFFSET + smallDrawerWidth - 15) * (1 / scale);
         createSprite(
-          {
-            x:
-              (monitor.getSourceClientOffset()?.x || 0) -
-              offsetX +
-              scrollContainerRef.current.scrollLeft,
-            y:
-              (monitor.getSourceClientOffset()?.y || 0) -
-              offsetY +
-              scrollContainerRef.current.scrollTop,
-          },
+          pointerToCanvas(monitor),
           item.storagePath || item.backgroundUrl,
           item.ratio,
         );
