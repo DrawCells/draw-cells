@@ -7,6 +7,8 @@ import BaseSidebar from "./BaseSidebar";
 
 import SpritesSection from "./SpritesSection";
 import BackgroundsSection from "./BackgroundsSection";
+import TextSection from "./TextSection";
+import ArrowSection from "./ArrowSection";
 
 export default function SpritesSidebar() {
   const dispatch = useDispatch();
@@ -26,6 +28,8 @@ export default function SpritesSidebar() {
       >
         <SpritesSection />
         <BackgroundsSection />
+        <TextSection />
+        <ArrowSection />
       </BaseSidebar>
     </>
   );

@@ -1,6 +1,6 @@
 import React, { memo, useEffect, useState } from "react";
 import { SPRITE_TO_SVG_ELEMENT_MAP } from "../constants";
-import { Sprite } from "../Frames/reducers/frames";
+import { ImageSprite } from "../Frames/reducers/frames";
 import { Box } from "@mui/material";
 import { resolveSpriteUrl } from "../helpers";
 
@@ -12,7 +12,7 @@ const styles: any = {
 };
 
 const BaseSpritePreview = memo(function BoxDragPreview(
-  props: Sprite & { name: string; ratio: number },
+  props: ImageSprite & { name: string; ratio: number },
 ) {
   const [tickTock, setTickTock] = useState(false);
   useEffect(

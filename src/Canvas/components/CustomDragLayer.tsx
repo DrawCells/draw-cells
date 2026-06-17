@@ -46,6 +46,42 @@ export const CustomDragLayer = () => {
   function renderItem() {
     switch (itemType) {
       case "SPRITE":
+        if (item.type === "SIDEBAR_TEXT") {
+          return (
+            <div
+              style={{
+                display: "inline-block",
+                padding: "1px 4px",
+                border: "1px dashed #0096fd",
+                background: "rgba(255,255,255,0.8)",
+                color: "#333",
+                fontSize: 12,
+                lineHeight: 1.2,
+                whiteSpace: "nowrap",
+              }}
+            >
+              Text
+            </div>
+          );
+        }
+        if (item.type === "SIDEBAR_ARROW") {
+          return (
+            <div
+              style={{
+                display: "inline-block",
+                padding: "1px 4px",
+                border: "1px dashed #0096fd",
+                background: "rgba(255,255,255,0.8)",
+                color: "#333",
+                fontSize: 18,
+                lineHeight: 1,
+                whiteSpace: "nowrap",
+              }}
+            >
+              →
+            </div>
+          );
+        }
         return (
           <BaseSpritePreview
             id={item.id}

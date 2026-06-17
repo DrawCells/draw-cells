@@ -34,6 +34,8 @@ import FramesSidebar from "../../Sidebars/components/FramesSidebar";
 import PropertiesSidebar from "../../Sidebars/components/PropertiesSidebar";
 import SpritesSidebar from "../../Sidebars/components/SpritesSidebar";
 import CanvasSprite from "../../Sprites/CanvasSprite";
+import CanvasText from "../../Sprites/CanvasText";
+import CanvasArrow from "../../Sprites/CanvasArrow";
 import State from "../../stateInterface";
 import { renderFrameToDataUrl, resolveImageUrl } from "../../helpers";
 import { zoomIn, zoomOut } from "../actions";
@@ -249,9 +251,77 @@ function AnimationCanvas() {
     }
   }
 
+  function createText(pos: XYCoord | null) {
+    if (!pos) return;
+    dispatch(
+      addSprite({
+        id: lastSpriteId,
+        kind: "text",
+        text: "Text",
+        fontSize: 24,
+        fontFamily: "Arial",
+        fill: "#000000",
+        align: "left",
+        position: pos,
+        width: 200,
+        height: 50,
+        rotation: 0,
+      }),
+    );
+  }
+
+  function createArrow(pos: XYCoord | null) {
+    if (!pos) return;
+    dispatch(
+      addSprite({
+        id: lastSpriteId,
+        kind: "arrow",
+        stroke: "#000000",
+        position: pos,
+        width: 120,
+        height: 24,
+        rotation: 0,
+      }),
+    );
+  }
+
   const [, drop] = useDrop({
     accept: "SPRITE",
     drop: (item: any, monitor) => {
+      if (item.type === "SIDEBAR_ARROW") {
+        const offsetX =
+          (VIEWPORT_WIDTH / 2 + OFFSET + leftDrawerWidth - 60) * (1 / scale);
+        const offsetY =
+          (VIEWPORT_HEIGHT / 2 + OFFSET + smallDrawerWidth - 12) * (1 / scale);
+        createArrow({
+          x:
+            (monitor.getSourceClientOffset()?.x || 0) -
+            offsetX +
+            scrollContainerRef.current.scrollLeft,
+          y:
+            (monitor.getSourceClientOffset()?.y || 0) -
+            offsetY +
+            scrollContainerRef.current.scrollTop,
+        });
+        return;
+      }
+      if (item.type === "SIDEBAR_TEXT") {
+        const offsetX =
+          (VIEWPORT_WIDTH / 2 + OFFSET + leftDrawerWidth - 100) * (1 / scale);
+        const offsetY =
+          (VIEWPORT_HEIGHT / 2 + OFFSET + smallDrawerWidth - 25) * (1 / scale);
+        createText({
+          x:
+            (monitor.getSourceClientOffset()?.x || 0) -
+            offsetX +
+            scrollContainerRef.current.scrollLeft,
+          y:
+            (monitor.getSourceClientOffset()?.y || 0) -
+            offsetY +
+            scrollContainerRef.current.scrollTop,
+        });
+        return;
+      }
       if (item.type === "SIDEBAR_SPRITE") {
         console.log("Dropped item:", item);
         const offsetX =
@@ -454,6 +524,23 @@ function AnimationCanvas() {
       n.scaleX(1);
       n.scaleY(1);
 
+      if (n.attrs.spriteKind === "text") {
+        dispatch(
+          updateSpriteFields({
+            id: n.attrs.spriteId,
+            fields: {
+              positionX: n.x(),
+              positionY: n.y(),
+              width: Math.max(20, n.width() * scaleX),
+              height: Math.max(5, n.height() * scaleY),
+              fontSize: Math.max(4, n.fontSize() * scaleY),
+              rotation: n.rotation(),
+            },
+          }),
+        );
+        continue;
+      }
+
       dispatch(
         updateSpriteFields({
           id: n.attrs.spriteId,
@@ -597,27 +684,83 @@ function AnimationCanvas() {
                               height2={nextFrameSprite.height}
                             />
                           )}
-                          <CanvasSprite
-                            backgroundUrl={s.backgroundUrl}
-                            x={s.position.x}
-                            y={s.position.y}
-                            width={s.width}
-                            height={s.height}
-                            rotation={s.rotation}
-                            onSelect={(e: MouseEvent) => {
-                              handleSelectSprite(e, s.id);
-                            }}
-                            ref={shapeRefs.current[s.id]}
-                            spriteId={s.id}
-                            onMouseEnter={() =>
-                              setCursor(isSelected ? "move" : "pointer")
-                            }
-                            onMouseLeave={() => setCursor("default")}
-                            offsetX={s.width / 2}
-                            offsetY={s.height / 2}
-                            draggable={!!isSelected}
-                            onDragEnd={(e: any) => handleDrag(e, s.position)}
-                          />
+                          {s.kind === "text" ? (
+                            <CanvasText
+                              text={s.text}
+                              fontSize={s.fontSize}
+                              fontFamily={s.fontFamily}
+                              fill={s.fill}
+                              align={s.align}
+                              fontStyle={s.fontStyle}
+                              x={s.position.x}
+                              y={s.position.y}
+                              width={s.width}
+                              height={s.height}
+                              rotation={s.rotation}
+                              onSelect={(e: MouseEvent) => {
+                                handleSelectSprite(e, s.id);
+                              }}
+                              ref={shapeRefs.current[s.id]}
+                              spriteId={s.id}
+                              onMouseEnter={() =>
+                                setCursor(isSelected ? "move" : "pointer")
+                              }
+                              onMouseLeave={() => setCursor("default")}
+                              offsetX={s.width / 2}
+                              offsetY={s.height / 2}
+                              draggable={!!isSelected}
+                              onDragEnd={(e: any) => handleDrag(e, s.position)}
+                              onCommit={(fields: Record<string, any>) =>
+                                dispatch(
+                                  updateSpriteFields({ id: s.id, fields }),
+                                )
+                              }
+                            />
+                          ) : s.kind === "arrow" ? (
+                            <CanvasArrow
+                              stroke={s.stroke}
+                              x={s.position.x}
+                              y={s.position.y}
+                              width={s.width}
+                              height={s.height}
+                              rotation={s.rotation}
+                              onSelect={(e: MouseEvent) => {
+                                handleSelectSprite(e, s.id);
+                              }}
+                              ref={shapeRefs.current[s.id]}
+                              spriteId={s.id}
+                              onMouseEnter={() =>
+                                setCursor(isSelected ? "move" : "pointer")
+                              }
+                              onMouseLeave={() => setCursor("default")}
+                              offsetX={s.width / 2}
+                              offsetY={s.height / 2}
+                              draggable={!!isSelected}
+                              onDragEnd={(e: any) => handleDrag(e, s.position)}
+                            />
+                          ) : (
+                            <CanvasSprite
+                              backgroundUrl={s.backgroundUrl}
+                              x={s.position.x}
+                              y={s.position.y}
+                              width={s.width}
+                              height={s.height}
+                              rotation={s.rotation}
+                              onSelect={(e: MouseEvent) => {
+                                handleSelectSprite(e, s.id);
+                              }}
+                              ref={shapeRefs.current[s.id]}
+                              spriteId={s.id}
+                              onMouseEnter={() =>
+                                setCursor(isSelected ? "move" : "pointer")
+                              }
+                              onMouseLeave={() => setCursor("default")}
+                              offsetX={s.width / 2}
+                              offsetY={s.height / 2}
+                              draggable={!!isSelected}
+                              onDragEnd={(e: any) => handleDrag(e, s.position)}
+                            />
+                          )}
                         </React.Fragment>
                       );
                     })}

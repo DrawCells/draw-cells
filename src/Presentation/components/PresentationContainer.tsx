@@ -10,7 +10,12 @@ import {
   nextAnimationFrame,
   prevAnimationFrame,
 } from "../../Frames/actions";
-import { Sprite } from "../../Frames/reducers/frames";
+import {
+  isArrowSprite,
+  isImageSprite,
+  isTextSprite,
+  Sprite,
+} from "../../Frames/reducers/frames";
 import AnimationSprite from "../../Sprites/AnimationSprite";
 import State from "../../stateInterface";
 import { get, ref } from "firebase/database";
@@ -82,7 +87,14 @@ const PresentationContainer = ({
               .concat(...spritesToRemove)
               .map((s: Sprite) => (
                 <AnimationSprite
-                  backgroundUrl={s.backgroundUrl}
+                  kind={s.kind}
+                  backgroundUrl={isImageSprite(s) ? s.backgroundUrl : undefined}
+                  text={isTextSprite(s) ? s.text : undefined}
+                  fontSize={isTextSprite(s) ? s.fontSize : undefined}
+                  fontFamily={isTextSprite(s) ? s.fontFamily : undefined}
+                  fill={isTextSprite(s) ? s.fill : undefined}
+                  align={isTextSprite(s) ? s.align : undefined}
+                  stroke={isArrowSprite(s) ? s.stroke : undefined}
                   id={s.id}
                   position={s.position}
                   key={`animation-${s.id}`}
