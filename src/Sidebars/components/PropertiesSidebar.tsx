@@ -1,12 +1,199 @@
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { Input, MenuItem, Select, Slider, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { updateAllSelectedSprites } from '../../Frames/actions';
+import { isArrowSprite, isTextSprite } from '../../Frames/reducers/frames';
 import State from '../../stateInterface';
 import { toggleProperties } from '../actions';
 import BaseSidebar from './BaseSidebar';
+
+function ColorInput({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}) {
+  return (
+    <Input
+      type="color"
+      disableUnderline
+      value={value}
+      onChange={onChange}
+      sx={{
+        '& input[type=color]': {
+          width: 56,
+          height: 28,
+          padding: 0,
+          cursor: 'pointer',
+        },
+        '& input[type=color]::-webkit-color-swatch-wrapper': { padding: 0 },
+        '& input[type=color]::-webkit-color-swatch': {
+          border: '1px solid #ccc',
+          borderRadius: '4px',
+        },
+        '& input[type=color]::-moz-color-swatch': {
+          border: '1px solid #ccc',
+          borderRadius: '4px',
+        },
+      }}
+    />
+  );
+}
+
+function SectionHeader({ title }: { title: string }) {
+  return (
+    <TableRow>
+      <TableCell colSpan={2}>
+        <Typography align="center" variant="body2" style={{ fontWeight: 'bold' }}>{title}</Typography>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function TextProperties({ currentSprite }: any) {
+  const dispatch = useDispatch();
+
+  // Local state so the field stays responsive while typing; the store update
+  // (which is undo-tracked) is debounced so a burst of typing is one undo entry.
+  const [textValue, setTextValue] = useState(currentSprite?.text ?? '');
+  const timer = useRef<any>(null);
+  const spriteId = currentSprite?.id;
+
+  // Reset to the store value when a different sprite is selected, and drop any
+  // pending debounced dispatch so it can't land on the newly selected sprite.
+  useEffect(() => {
+    setTextValue(currentSprite?.text ?? '');
+    return () => {
+      if (timer.current) clearTimeout(timer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spriteId]);
+
+  const commit = (value: string) => {
+    if (value !== (currentSprite?.text ?? '')) {
+      dispatch(updateAllSelectedSprites({ field: 'text', value }));
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) => {
+    const value = e.target.value;
+    setTextValue(value);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => commit(value), 400);
+  };
+
+  // Flush immediately on blur (e.g. clicking another sprite) so we don't lose
+  // the last keystrokes still inside the debounce window.
+  const handleBlur = () => {
+    if (timer.current) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
+    commit(textValue);
+  };
+
+  return (
+    <>
+      <SectionHeader title="Text" />
+      <TableRow key="text">
+        <TableCell>Text</TableCell>
+        <TableCell>
+          <Input
+            multiline
+            value={textValue}
+            onChange={handleChange}
+            onBlur={handleBlur}
+          />
+        </TableCell>
+      </TableRow>
+      <TableRow key="fontSize">
+        <TableCell>Font Size</TableCell>
+        <TableCell>
+          <Input
+            type="number"
+            value={currentSprite?.fontSize ?? ''}
+            onChange={(e) => dispatch(updateAllSelectedSprites({ field: 'fontSize', value: parseInt(e.target.value) || 0 }))}
+          />
+        </TableCell>
+      </TableRow>
+      <TableRow key="fill">
+        <TableCell>Color</TableCell>
+        <TableCell>
+          <ColorInput
+            value={currentSprite?.fill || '#000000'}
+            onChange={(e) => dispatch(updateAllSelectedSprites({ field: 'fill', value: e.target.value }))}
+          />
+        </TableCell>
+      </TableRow>
+      <TableRow key="fontFamily">
+        <TableCell>Font</TableCell>
+        <TableCell>
+          <Select
+            size="small"
+            value={currentSprite?.fontFamily || 'Arial'}
+            onChange={(e) => dispatch(updateAllSelectedSprites({ field: 'fontFamily', value: e.target.value }))}
+          >
+            <MenuItem value="Arial">Arial</MenuItem>
+            <MenuItem value="Times New Roman">Times New Roman</MenuItem>
+            <MenuItem value="Courier New">Courier New</MenuItem>
+            <MenuItem value="Georgia">Georgia</MenuItem>
+            <MenuItem value="Verdana">Verdana</MenuItem>
+          </Select>
+        </TableCell>
+      </TableRow>
+      <TableRow key="align">
+        <TableCell>Align</TableCell>
+        <TableCell>
+          <Select
+            size="small"
+            value={currentSprite?.align || 'left'}
+            onChange={(e) => dispatch(updateAllSelectedSprites({ field: 'align', value: e.target.value }))}
+          >
+            <MenuItem value="left">Left</MenuItem>
+            <MenuItem value="center">Center</MenuItem>
+            <MenuItem value="right">Right</MenuItem>
+          </Select>
+        </TableCell>
+      </TableRow>
+      <TableRow key="fontStyle">
+        <TableCell>Style</TableCell>
+        <TableCell>
+          <Select
+            size="small"
+            value={currentSprite?.fontStyle || 'normal'}
+            onChange={(e) => dispatch(updateAllSelectedSprites({ field: 'fontStyle', value: e.target.value }))}
+          >
+            <MenuItem value="normal">Normal</MenuItem>
+            <MenuItem value="bold">Bold</MenuItem>
+            <MenuItem value="italic">Italic</MenuItem>
+            <MenuItem value="italic bold">Bold Italic</MenuItem>
+          </Select>
+        </TableCell>
+      </TableRow>
+    </>
+  );
+}
+
+function ArrowProperties({ currentSprite }: any) {
+  const dispatch = useDispatch();
+  return (
+    <>
+      <SectionHeader title="Arrow" />
+      <TableRow key="stroke">
+        <TableCell>Color</TableCell>
+        <TableCell>
+          <ColorInput
+            value={currentSprite?.stroke || '#000000'}
+            onChange={(e) => dispatch(updateAllSelectedSprites({ field: 'stroke', value: e.target.value }))}
+          />
+        </TableCell>
+      </TableRow>
+    </>
+  );
+}
 
 function ChaoticAnimationProperties({currentSprite}: any) {
   const dispatch = useDispatch()
@@ -85,7 +272,7 @@ export default function PropertiesSidebar() {
       iconRenderer={() => isPropertiesSidebarOpen ? <ChevronRightIcon /> : <ChevronLeftIcon />}
       anchor="right"
     >
-      <div style={{height: '100vh'}}>
+      <div style={{height: '100%', overflowY: 'auto'}}>
         <Table size="small" style={{width: 'calc(100% - 20px)'}}>
           <TableHead>
             <TableRow>
@@ -136,6 +323,12 @@ export default function PropertiesSidebar() {
                 />
               </TableCell>
             </TableRow>
+            {currentSprite && isTextSprite(currentSprite) && (
+              <TextProperties currentSprite={currentSprite} />
+            )}
+            {currentSprite && isArrowSprite(currentSprite) && (
+              <ArrowProperties currentSprite={currentSprite} />
+            )}
             <TableRow>
               <TableCell colSpan={2}>
                 <Typography align="center" variant="body2" style={{fontWeight: 'bold'}}>Animation</Typography>
