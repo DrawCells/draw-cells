@@ -1,10 +1,4 @@
-import {
-  Accordion,
-  AccordionSummary,
-  Box,
-  CircularProgress,
-} from "@mui/material";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import { Box, CircularProgress, Typography } from "@mui/material";
 import InfiniteScroll from "react-infinite-scroll-component";
 import { useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
@@ -12,22 +6,17 @@ import State from "../../stateInterface";
 import { setCurrentFrameBackground } from "../../Frames/actions";
 import { loadBackgrounds } from "../actions";
 
-function BackgroundsSection() {
+function BackgroundsSection({ active }: { active: boolean }) {
   const dispatch = useDispatch();
   const backgrounds = useSelector((state: State) => state.sidebars.backgrounds);
-  const isSpritesSidebarOpen = useSelector(
-    (state: State) => state.sidebars.isSpritesOpen,
-  );
 
   const pageTokens = useRef<(string | undefined)[]>([]);
   const hasLoadedOnceRef = useRef(false);
   const [page, setPage] = useState<number>(0);
-  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     if (
-      !isSpritesSidebarOpen ||
-      !isExpanded ||
+      !active ||
       backgrounds.hasEnded ||
       (hasLoadedOnceRef.current && page === 0)
     )
@@ -40,7 +29,7 @@ function BackgroundsSection() {
       const currentToken = pageTokens.current?.shift();
       const params = new URLSearchParams({
         prefix: "backgrounds",
-        maxResults: "10",
+        maxResults: "20",
       });
       if (currentToken) params.set("pageToken", currentToken);
 
@@ -57,7 +46,7 @@ function BackgroundsSection() {
     };
 
     getBg();
-  }, [isSpritesSidebarOpen, isExpanded, dispatch, page]);
+  }, [active, dispatch, page, backgrounds.hasEnded]);
 
   const handleNext = () => {
     setPage(page + 1);
@@ -68,35 +57,30 @@ function BackgroundsSection() {
   };
 
   return (
-    <Accordion
-      expanded={isExpanded}
-      onChange={(_, expanded) => setIsExpanded(expanded)}
-      elevation={0}
-      sx={{
-        width: "100%",
-        boxShadow: "none",
-        "&.MuiPaper-rounded": { borderRadius: 0 },
-      }}
-    >
-      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+    <Box id="backgrounds-scroll" sx={{ height: "100%", overflowY: "auto" }}>
+      <Typography variant="subtitle2" sx={{ px: 2, pt: 1.5, pb: 1 }}>
         Background Images
-      </AccordionSummary>
+      </Typography>
       <InfiniteScroll
-        dataLength={backgrounds.list.length} //This is important field to render the next data
+        dataLength={backgrounds.list.length}
         next={handleNext}
         hasMore={!backgrounds?.hasEnded}
-        loader={<CircularProgress />}
-        height={400}
+        loader={
+          <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}>
+            <CircularProgress size={24} />
+          </Box>
+        }
+        scrollableTarget="backgrounds-scroll"
       >
         <Box
           sx={{
-            height: "100%",
             width: "100%",
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
             alignItems: "center",
             justifyContent: "center",
             gap: 2,
+            px: 1,
           }}
         >
           {backgrounds?.list?.map((bg: any, index: number) => (
@@ -104,9 +88,10 @@ function BackgroundsSection() {
               key={`bg-image-${index}`}
               onClick={() => handleFrameBackground(bg.path)}
               style={{
-                width: "100px",
+                width: "100%",
                 display: "flex",
                 justifyContent: "center",
+                cursor: "pointer",
               }}
             >
               <img src={bg.url} alt={bg.path} style={{ width: "90%" }} />
@@ -114,7 +99,7 @@ function BackgroundsSection() {
           ))}
         </Box>
       </InfiniteScroll>
-    </Accordion>
+    </Box>
   );
 }
 
