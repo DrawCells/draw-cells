@@ -29,10 +29,10 @@ export interface Position {
   x: number;
   y: number;
 }
-export interface Sprite {
+// Fields shared by every item that lives on the canvas (geometry + animation).
+export interface BaseSprite {
   id: number | string;
   position: Position;
-  backgroundUrl?: string | undefined;
   animationType?: string | undefined;
   scale?: number | undefined;
   duration?: number | undefined;
@@ -50,6 +50,45 @@ export interface Sprite {
   rotation: number;
   groupId?: string;
 }
+
+// An image-backed sprite (the historical default). `kind` is optional so that
+// pre-existing persisted sprites without a `kind` field deserialize as images.
+export interface ImageSprite extends BaseSprite {
+  kind?: "image";
+  backgroundUrl?: string | undefined;
+}
+
+// A text box rendered with a Konva Text node.
+export interface TextSprite extends BaseSprite {
+  kind: "text";
+  text: string;
+  fontSize: number;
+  fontFamily?: string;
+  fill?: string;
+  align?: string;
+  fontStyle?: string;
+}
+
+// A straight arrow rendered with a Konva Arrow node. Like an image sprite it is
+// box-based (position/width/height/rotation); the arrow geometry is derived
+// from that box (see arrowGeometry in helpers).
+export interface ArrowSprite extends BaseSprite {
+  kind: "arrow";
+  stroke?: string;
+}
+
+// The canvas accepts all of these; branch on `kind` to render the right node.
+export type Sprite = ImageSprite | TextSprite | ArrowSprite;
+
+export const isTextSprite = (s: Sprite): s is TextSprite => s.kind === "text";
+
+export const isArrowSprite = (s: Sprite): s is ArrowSprite =>
+  s.kind === "arrow";
+
+// Image sprites are the default: `kind` is "image" or absent (for sprites
+// persisted before the discriminant existed).
+export const isImageSprite = (s: Sprite): s is ImageSprite =>
+  s.kind === undefined || s.kind === "image";
 
 export interface Frame {
   id: number | string | null;

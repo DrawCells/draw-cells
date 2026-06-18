@@ -1,6 +1,11 @@
 import React, { useEffect } from "react";
 import { animated, to, useSpring } from "@react-spring/konva";
-import { resolveImageUrl } from "../helpers";
+import { Arrow } from "react-konva";
+import { arrowGeometry, resolveImageUrl } from "../helpers";
+
+// Animated wrapper so the arrow's rotation/scale/opacity tween like the image
+// and text nodes (which use svgProps).
+const AnimatedArrow = animated(Arrow);
 
 function getCurrentAndPrevSprite(animationProps) {
   const { prevFrame, id } = animationProps;
@@ -24,6 +29,13 @@ export default function AnimationSprite(props) {
   const {
     position,
     backgroundUrl,
+    kind,
+    text,
+    fontSize,
+    fontFamily,
+    fill,
+    align,
+    stroke,
     scale,
     width,
     height,
@@ -175,9 +187,43 @@ export default function AnimationSprite(props) {
     return () => { cancelled = true; };
   }, [backgroundUrl]);
 
+  const arrowGeom = kind === "arrow" ? arrowGeometry(width, height) : null;
+
   return (
     <animated.Group width={width} height={height} {...animationProps}>
-      <animated.Image image={img} width={width} height={height} {...svgProps} />
+      {kind === "arrow" ? (
+        <AnimatedArrow
+          points={arrowGeom.points}
+          stroke={stroke || "#000000"}
+          fill={stroke || "#000000"}
+          strokeWidth={arrowGeom.strokeWidth}
+          pointerWidth={arrowGeom.pointerWidth}
+          pointerLength={arrowGeom.pointerLength}
+          width={width}
+          height={height}
+          {...svgProps}
+        />
+      ) : kind === "text" ? (
+        <animated.Text
+          text={text}
+          fontSize={fontSize}
+          fontFamily={fontFamily || "Arial"}
+          fill={fill || "#000000"}
+          align={align || "left"}
+          verticalAlign="middle"
+          wrap="word"
+          width={width}
+          height={height}
+          {...svgProps}
+        />
+      ) : (
+        <animated.Image
+          image={img}
+          width={width}
+          height={height}
+          {...svgProps}
+        />
+      )}
     </animated.Group>
   );
 }

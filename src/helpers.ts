@@ -1,6 +1,95 @@
 import Konva from "konva";
 import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH } from "./constants";
-import { Sprite } from "./Frames/reducers/frames";
+import { isArrowSprite, isTextSprite, Sprite } from "./Frames/reducers/frames";
+
+// Derives the Konva Arrow geometry for an arrow sprite from its bounding box:
+// a horizontal arrow across the box with the head sized to the box height.
+export function arrowGeometry(width: number, height: number) {
+  return {
+    points: [0, height / 2, width, height / 2],
+    strokeWidth: Math.max(2, height * 0.18),
+    pointerWidth: height,
+    pointerLength: Math.min(width * 0.5, height),
+  };
+}
+
+// Adds a single sprite (image or text) to a Konva layer, mirroring how the
+// editing canvas renders it. Used for frame thumbnails and video export so the
+// rendering stays in one place.
+export async function addSpriteToLayer(
+  layer: Konva.Layer,
+  s: Sprite,
+): Promise<void> {
+  if (isTextSprite(s)) {
+    layer.add(
+      new Konva.Text({
+        x: s.position.x,
+        y: s.position.y,
+        text: s.text,
+        fontSize: s.fontSize,
+        fontFamily: s.fontFamily || "Arial",
+        fontStyle: s.fontStyle || "normal",
+        fill: s.fill || "#000000",
+        align: s.align || "left",
+        verticalAlign: "middle",
+        wrap: "word",
+        width: s.width,
+        height: s.height,
+        offsetX: s.width / 2,
+        offsetY: s.height / 2,
+        rotation: s.rotation,
+        opacity: s.opacity ?? 1,
+      }),
+    );
+    return;
+  }
+
+  if (isArrowSprite(s)) {
+    const geom = arrowGeometry(s.width, s.height);
+    layer.add(
+      new Konva.Arrow({
+        x: s.position.x,
+        y: s.position.y,
+        points: geom.points,
+        stroke: s.stroke || "#000000",
+        fill: s.stroke || "#000000",
+        strokeWidth: geom.strokeWidth,
+        pointerWidth: geom.pointerWidth,
+        pointerLength: geom.pointerLength,
+        offsetX: s.width / 2,
+        offsetY: s.height / 2,
+        rotation: s.rotation,
+        opacity: s.opacity ?? 1,
+      }),
+    );
+    return;
+  }
+
+  const src = await resolveImageUrl(s.backgroundUrl || "");
+  if (!src) return;
+  await new Promise<void>((resolve) => {
+    const img = new window.Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      layer.add(
+        new Konva.Image({
+          x: s.position.x,
+          y: s.position.y,
+          image: img,
+          width: s.width,
+          height: s.height,
+          rotation: s.rotation,
+          offsetX: s.width / 2,
+          offsetY: s.height / 2,
+          opacity: s.opacity ?? 1,
+        }),
+      );
+      resolve();
+    };
+    img.onerror = () => resolve();
+    img.src = src;
+  });
+}
 
 export async function renderFrameToDataUrl(sprites: Sprite[]): Promise<string> {
   const container = document.createElement("div");
@@ -16,27 +105,7 @@ export async function renderFrameToDataUrl(sprites: Sprite[]): Promise<string> {
   layer.add(background);
   background.moveToBottom();
 
-  await Promise.all(
-    sprites.map(async (s) => {
-      const src = await resolveImageUrl(s.backgroundUrl || "");
-      if (!src) return;
-      await new Promise<void>((resolve) => {
-        const img = new window.Image();
-        img.crossOrigin = "anonymous";
-        img.onload = () => {
-          layer.add(new Konva.Image({
-            x: s.position.x, y: s.position.y, image: img,
-            width: s.width, height: s.height, rotation: s.rotation,
-            offsetX: s.width / 2, offsetY: s.height / 2,
-            opacity: s.opacity ?? 1,
-          }));
-          resolve();
-        };
-        img.onerror = () => resolve();
-        img.src = src;
-      });
-    }),
-  );
+  await Promise.all(sprites.map((s) => addSpriteToLayer(layer, s)));
 
   stage.draw();
   const dataUrl = stage.toDataURL({ pixelRatio: 2 });

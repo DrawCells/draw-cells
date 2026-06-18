@@ -13,39 +13,55 @@ const layerStyles: any = {
   height: "100%",
 };
 
-function getItemStyles(
-  initialOffset: any,
-  currentOffset: any,
-  item: any,
-  canvasScale: number
-) {
-  if (!initialOffset || !currentOffset) {
-    return {
-      display: "none",
-    };
-  }
-  let { x, y } = currentOffset;
-  const translateX = x + 30 * ((item.scale || 1) * canvasScale - 1);
-  const translateY = y + 30 * ((item.scale || 1) * canvasScale - 1);
-  const transform = `translate(${translateX}px, ${translateY}px)`;
-  return {
-    transform,
-    WebkitTransform: transform,
-  };
-}
 export const CustomDragLayer = () => {
   const canvasScale = useSelector((state: State) => state.canvas.scale);
-  const { itemType, isDragging, item, initialOffset, currentOffset } =
-    useDragLayer((monitor) => ({
+  const { itemType, isDragging, item, pointerOffset } = useDragLayer(
+    (monitor) => ({
       item: monitor.getItem(),
       itemType: monitor.getItemType(),
-      initialOffset: monitor.getInitialSourceClientOffset(),
-      currentOffset: monitor.getSourceClientOffset(),
+      pointerOffset: monitor.getClientOffset(),
       isDragging: monitor.isDragging(),
-    }));
+    }),
+  );
   function renderItem() {
     switch (itemType) {
       case "SPRITE":
+        if (item.type === "SIDEBAR_TEXT") {
+          return (
+            <div
+              style={{
+                display: "inline-block",
+                padding: "1px 4px",
+                border: "1px dashed #0096fd",
+                background: "rgba(255,255,255,0.8)",
+                color: "#333",
+                fontSize: 12,
+                lineHeight: 1.2,
+                whiteSpace: "nowrap",
+              }}
+            >
+              Text
+            </div>
+          );
+        }
+        if (item.type === "SIDEBAR_ARROW") {
+          return (
+            <div
+              style={{
+                display: "inline-block",
+                padding: "1px 4px",
+                border: "1px dashed #0096fd",
+                background: "rgba(255,255,255,0.8)",
+                color: "#333",
+                fontSize: 18,
+                lineHeight: 1,
+                whiteSpace: "nowrap",
+              }}
+            >
+              →
+            </div>
+          );
+        }
         return (
           <BaseSpritePreview
             id={item.id}
@@ -65,13 +81,17 @@ export const CustomDragLayer = () => {
     }
   }
 
-  if (!isDragging) return null;
+  if (!isDragging || !pointerOffset) return null;
+
+  // Anchor every preview to the actual mouse pointer, centered on it via the
+  // element's own box, rather than the dragged source element's top-left (which
+  // floats the ghost away from the cursor). The drop handler maps the same
+  // pointer to canvas coords, so preview and dropped item land together.
+  const transform = `translate(${pointerOffset.x}px, ${pointerOffset.y}px) translate(-50%, -50%)`;
 
   return (
     <div style={layerStyles}>
-      <div
-        style={getItemStyles(initialOffset, currentOffset, item, canvasScale)}
-      >
+      <div style={{ display: "inline-block", transform, WebkitTransform: transform }}>
         {renderItem()}
       </div>
     </div>

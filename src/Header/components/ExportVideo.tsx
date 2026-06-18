@@ -6,7 +6,7 @@ import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH } from "../../constants";
 import { Sprite } from "../../Frames/reducers/frames";
 import Konva from "konva";
 import ArrowDropDown from "@mui/icons-material/ArrowDropDown";
-import { renderFrameToDataUrl, resolveImageUrl } from "../../helpers";
+import { addSpriteToLayer, renderFrameToDataUrl } from "../../helpers";
 
 async function uploadImage(file: File, presentationId: string) {
   // Step 1: get a presigned URL
@@ -81,32 +81,7 @@ export default function ExportVideo({
     background.moveToBottom();
 
     await Promise.all(
-      sprites.map(async (s) => {
-        const src = await resolveImageUrl(s.backgroundUrl || "");
-        if (!src) return;
-        await new Promise<void>((resolve) => {
-          const img = new window.Image();
-          img.crossOrigin = "anonymous";
-          img.onload = () => {
-            layer.add(
-              new Konva.Image({
-                x: s.position.x,
-                y: s.position.y,
-                image: img,
-                width: s.width,
-                height: s.height,
-                rotation: s.rotation,
-                offsetX: s.width / 2,
-                offsetY: s.height / 2,
-                opacity: s.opacity ?? 1,
-              }),
-            );
-            resolve();
-          };
-          img.onerror = () => resolve();
-          img.src = src;
-        });
-      }),
+      sprites.map((s) => addSpriteToLayer(layer, s)),
     );
 
     stage.draw();

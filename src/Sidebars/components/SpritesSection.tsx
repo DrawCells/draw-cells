@@ -1,11 +1,4 @@
-import {
-  Accordion,
-  AccordionSummary,
-  Box,
-  CircularProgress,
-  TextField,
-} from "@mui/material";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import { Box, CircularProgress, TextField, Typography } from "@mui/material";
 import InfiniteScroll from "react-infinite-scroll-component";
 import { useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
@@ -31,7 +24,7 @@ interface SpriteInfo {
   variants?: string[];
 }
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 20;
 
 async function resolveSpriteImageUrl(id: string, sprite: SpriteInfo): Promise<SpriteInfo> {
   let imageUrl = sprite.baseImageUrl;
@@ -58,17 +51,13 @@ async function resolveSpriteImageUrl(id: string, sprite: SpriteInfo): Promise<Sp
   };
 }
 
-export default function SpritesSection() {
+export default function SpritesSection({ active }: { active: boolean }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState<SpriteInfo[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const dispatch = useDispatch();
   const sprites = useSelector((state: State) => state.sidebars.sprites);
-  const isSpritesSidebarOpen = useSelector(
-    (state: State) => state.sidebars.isSpritesOpen,
-  );
-  const [isExpanded, setIsExpanded] = useState(false);
   const hasLoadedOnceRef = useRef(false);
   const lastKeyRef = useRef<string | undefined>(undefined);
   const searchIdRef = useRef(0);
@@ -83,7 +72,7 @@ export default function SpritesSection() {
   // Firebase RTDB doesn't support substring or multi-field queries, so client-side
   // filtering is applied after fetching all records.
   useEffect(() => {
-    if (!debouncedSearchTerm || !isSpritesSidebarOpen || !isExpanded) {
+    if (!debouncedSearchTerm || !active) {
       setSearchResults([]);
       return;
     }
@@ -114,14 +103,13 @@ export default function SpritesSection() {
     };
 
     runSearch();
-  }, [debouncedSearchTerm, isSpritesSidebarOpen, isExpanded]);
+  }, [debouncedSearchTerm, active]);
 
   // Paginated fetch — only runs when there is no active search term.
   useEffect(() => {
     if (
       debouncedSearchTerm ||
-      !isSpritesSidebarOpen ||
-      !isExpanded ||
+      !active ||
       sprites.hasEnded ||
       (hasLoadedOnceRef.current && page === 0)
     ) {
@@ -158,7 +146,7 @@ export default function SpritesSection() {
     };
 
     getSprites();
-  }, [dispatch, isSpritesSidebarOpen, isExpanded, sprites.hasEnded, page, debouncedSearchTerm]);
+  }, [dispatch, active, sprites.hasEnded, page, debouncedSearchTerm]);
 
   const handleNext = () => setPage((prev) => prev + 1);
 
@@ -166,77 +154,58 @@ export default function SpritesSection() {
   const hasMore = !debouncedSearchTerm && !sprites.hasEnded;
 
   return (
-    <Accordion
-      expanded={isExpanded}
-      onChange={(_, expanded) => setIsExpanded(expanded)}
-      elevation={0}
-      sx={{
-        width: "100%",
-        boxShadow: "none",
-        "&.MuiPaper-rounded": { borderRadius: 0 },
-      }}
-    >
-      <AccordionSummary
-        expandIcon={<ExpandMoreIcon />}
-        sx={{
-          "&.Mui-expanded": { minHeight: "48px" },
-          "& .MuiAccordionSummary-content": {
-            margin: 0,
-          },
-        }}
-      >
-        Sprites
-      </AccordionSummary>
-      <Box>
-        <Box sx={{ pl: 2, mb: 1 }}>
-          <TextField
-            fullWidth
-            variant="outlined"
-            placeholder="Search Sprites"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            autoComplete="off"
-            sx={{
-              "& .MuiInputBase-input": {
-                fontSize: 13,
-                py: 1,
-                px: 2,
-              },
-            }}
-          />
-        </Box>
-        <InfiniteScroll
-          dataLength={displaySprites.length}
-          next={handleNext}
-          hasMore={hasMore}
-          loader={null}
-          height={400}
-        >
-          <Box
-            sx={{
-              width: "100%",
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              alignItems: "center",
-            }}
-          >
-            {displaySprites.map((sprite, i) => (
-              <SidebarSpriteWithVariants
-                key={sprite.id ?? `sprite-${i}`}
-                name={sprite.name}
-                variants={sprite.variants}
-                previewImageUrl={sprite.previewImageUrl}
-                baseImageUrl={sprite.baseImageUrl}
-              />
-            ))}
-          </Box>
-          {(isSearching || hasMore) && (
-            <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}>
-              <CircularProgress size={24} />
-            </Box>
-          )}
-        </InfiniteScroll>
+    <Box id="sprites-scroll" sx={{ height: "100%", overflowY: "auto" }}>
+      <Typography variant="subtitle2" sx={{ px: 2, pt: 1.5, pb: 1 }}>
+        Library
+      </Typography>
+      <Box sx={{ px: 2, mb: 1 }}>
+        <TextField
+          fullWidth
+          variant="outlined"
+          placeholder="Search Library"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          autoComplete="off"
+          sx={{
+            "& .MuiInputBase-input": {
+              fontSize: 13,
+              py: 1,
+              px: 2,
+            },
+          }}
+        />
       </Box>
-    </Accordion>
+      <InfiniteScroll
+        dataLength={displaySprites.length}
+        next={handleNext}
+        hasMore={hasMore}
+        loader={null}
+        scrollableTarget="sprites-scroll"
+      >
+        <Box
+          sx={{
+            width: "100%",
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            alignItems: "center",
+          }}
+        >
+          {displaySprites.map((sprite, i) => (
+            <SidebarSpriteWithVariants
+              key={sprite.id ?? `sprite-${i}`}
+              name={sprite.name}
+              variants={sprite.variants}
+              previewImageUrl={sprite.previewImageUrl}
+              baseImageUrl={sprite.baseImageUrl}
+            />
+          ))}
+        </Box>
+        {(isSearching || hasMore) && (
+          <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}>
+            <CircularProgress size={24} />
+          </Box>
+        )}
+      </InfiniteScroll>
+    </Box>
   );
 }
