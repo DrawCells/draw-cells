@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Text } from "react-konva";
+import { useStore } from "react-redux";
 
 // A text box rendered as a Konva Text node. Double-clicking overlays a native
 // <textarea> positioned over the node so the user can edit it in place.
@@ -30,6 +31,7 @@ const CanvasText = React.forwardRef(
     const textRef = React.useRef<any>(null);
     const editingRef = React.useRef(false);
     const [isEditing, setIsEditing] = React.useState(false);
+    const store = useStore<any>();
 
     // Forward the Konva node to both our internal ref and the parent's ref
     // (the parent attaches it to the Transformer).
@@ -40,6 +42,17 @@ const CanvasText = React.forwardRef(
     };
 
     const startEditing = () => {
+      // Editing requires the text to be selected first. Read selection from the
+      // live store rather than a prop: the dblclick fires synchronously after
+      // its clicks (which toggle selection) and before React re-renders, so the
+      // prop would be stale. The live store reflects the true pre-dblclick
+      // selection state (the two click toggles cancel out).
+      const selected = store
+        .getState()
+        .frames.currentSprites.some(
+          (s: any) => s.id.toString() === spriteId.toString(),
+        );
+      if (!selected) return;
       const node = textRef.current;
       const stage = node?.getStage();
       if (!node || !stage || editingRef.current) return;
