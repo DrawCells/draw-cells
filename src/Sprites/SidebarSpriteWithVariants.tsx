@@ -42,7 +42,9 @@ export default function SidebarSpriteWithVariants({
   };
 
   const open = Boolean(anchorEl);
-  const hasVariants = Boolean(variants && variants.length > 0);
+  // Only offer the variant picker when there is an actual choice (>1). A single
+  // variant has nothing to pick, so it behaves like a plain sprite.
+  const hasMultipleVariants = Boolean(variants && variants.length > 1);
   const variantsCount = variants?.length ?? 0;
   const basePath = useMemo(() => {
     if (!baseImageUrl) return "";
@@ -86,12 +88,20 @@ export default function SidebarSpriteWithVariants({
     loadVariantUrls();
   }, [open, variants, basePath, variantUrls]);
 
-  if (!hasVariants) {
+  if (!hasMultipleVariants) {
+    // No picker: drag the single variant directly if there is one (its file is
+    // "<base> - <variant>.svg"), otherwise the plain base sprite.
+    const singleVariant = variants && variants.length === 1 ? variants[0] : undefined;
+    const storagePath = !basePath
+      ? undefined
+      : singleVariant
+        ? `${basePath} - ${singleVariant}.svg`
+        : `${basePath}.svg`;
     return (
       <SidebarSprite
         name={name}
         backgroundUrl={previewImageUrl}
-        storagePath={basePath ? `${basePath}.svg` : undefined}
+        storagePath={storagePath}
         onDragStart={handleVariantDragStart}
       />
     );
@@ -126,7 +136,7 @@ export default function SidebarSpriteWithVariants({
           width={50}
           height={50}
         />
-        {hasVariants && (
+        {hasMultipleVariants && (
           <Box
             sx={{
               position: "absolute",

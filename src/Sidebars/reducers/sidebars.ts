@@ -1,8 +1,9 @@
 import { PayloadAction } from "@reduxjs/toolkit";
-import { Actions } from "../actions";
+import { Actions, LeftPanel } from "../actions";
 
 const initialState: SidebarsState = {
   isSpritesOpen: false,
+  activeLeftPanel: null,
   isFramesOpen: false,
   isPropertiesOpen: false,
   backgrounds: {
@@ -16,7 +17,10 @@ const initialState: SidebarsState = {
 };
 
 export interface SidebarsState {
+  // True when any left-rail panel is open. Kept in sync with activeLeftPanel so
+  // the canvas/frames layout (which only needs a boolean) stays unchanged.
   isSpritesOpen: boolean;
+  activeLeftPanel: LeftPanel | null;
   isFramesOpen: boolean;
   isPropertiesOpen: boolean;
   backgrounds: {
@@ -40,6 +44,15 @@ export const sidebars = (
         ...state,
         isSpritesOpen: !state.isSpritesOpen,
       };
+    case Actions.SET_LEFT_PANEL: {
+      const nextPanel =
+        state.activeLeftPanel === action.payload ? null : action.payload;
+      return {
+        ...state,
+        activeLeftPanel: nextPanel,
+        isSpritesOpen: nextPanel !== null,
+      };
+    }
     case Actions.TOGGLE_PROPERTIES:
       return {
         ...state,
