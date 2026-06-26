@@ -13,6 +13,7 @@ const initialState: FramesState = {
   prevFrame: null,
   nextFrame: null,
   currentSprites: [],
+  linkSourceId: null,
   title: "",
   isFramesSaving: false,
   _past: [],
@@ -110,6 +111,9 @@ export interface FramesState {
   prevFrame: Frame | null;
   nextFrame: Frame | null;
   currentSprites: Array<Sprite>;
+  // Transient pointer to a sprite id "copied" for linking; not persisted and not
+  // part of the undo history.
+  linkSourceId: number | string | null;
   title: string;
   isFramesSaving?: boolean;
   _past: Array<FramesSnapshot>;
@@ -438,6 +442,7 @@ const TRACKED_ACTIONS = new Set([
   'SET_CURRENT_FRAME_BACKGROUND',
   'GROUP_SPRITES',
   'UNGROUP_SPRITES',
+  'LINK_SPRITE_TO_COPIED',
 ]);
 
 const snapshot = (state: FramesState): FramesSnapshot => ({
@@ -762,6 +767,52 @@ export const frames = (
         };
       }
       return { ...state };
+    }
+    case Actions.COPY_SPRITE_LINK: {
+      // Remember the source sprite id; the actual relinking happens later in
+      // LINK_SPRITE_TO_COPIED once a target sprite is selected.
+      return { ...state, linkSourceId: payload };
+    }
+    case Actions.LINK_SPRITE_TO_COPIED: {
+      const sourceId = state.linkSourceId;
+      // Need a copied source and exactly one selected target to link.
+      if (sourceId == null || state.currentSprites.length !== 1) {
+        return { ...state };
+      }
+      const target = state.currentSprites[0];
+      // Already the same identity — nothing to do.
+      if (target.id === sourceId) return { ...state };
+      // Refuse if the current frame already contains the source id: two sprites
+      // sharing an id within a single frame is exactly the corruption this
+      // feature exists to prevent.
+      const wouldCollide = state.currentFrame.sprites.some(
+        (s) => s.id === sourceId,
+      );
+      if (wouldCollide) return { ...state };
+
+      const crtFrame = {
+        ...state.currentFrame,
+        sprites: state.currentFrame.sprites.map((s) =>
+          s.id === target.id
+            ? { ...structuredClone(s), id: sourceId }
+            : structuredClone(s),
+        ),
+      };
+      const { frames: newFrames, currentFrame: newCurrentFrame } =
+        computeNewFrames(state.frames, crtFrame);
+      const nextFrame = computeNextFrame(newFrames, newCurrentFrame);
+      return {
+        ...state,
+        frames: newFrames,
+        currentFrame: newCurrentFrame,
+        nextFrame,
+        // Keep the relinked sprite selected and drop the copied link now that
+        // it has been consumed.
+        currentSprites: newCurrentFrame.sprites.filter(
+          (s) => s.id === sourceId,
+        ),
+        linkSourceId: null,
+      };
     }
     case Actions.ADD_FRAME: {
       const { frame: incomingFrame, afterId } = payload;

@@ -45,6 +45,8 @@ export const Actions = {
   REDO: "REDO",
   GROUP_SPRITES: "GROUP_SPRITES",
   UNGROUP_SPRITES: "UNGROUP_SPRITES",
+  COPY_SPRITE_LINK: "COPY_SPRITE_LINK",
+  LINK_SPRITE_TO_COPIED: "LINK_SPRITE_TO_COPIED",
 };
 
 export const loadInitialData = (payload: any) => ({
@@ -107,6 +109,20 @@ export const copySpriteIntoFrame = (
 export const copySelectedSpriteSIntoFrame = (frameId: number | string) => ({
   type: Actions.COPY_SELECTED_SPRITES_INTO_FRAME,
   payload: { frameId },
+});
+
+// Remembers a sprite's id so another sprite (in a different frame) can later
+// adopt it via linkSpriteToCopied, making the two share an identity and animate
+// into each other across frames.
+export const copySpriteLink = (spriteId: number | string) => ({
+  type: Actions.COPY_SPRITE_LINK,
+  payload: spriteId,
+});
+
+// Makes the currently selected sprite adopt the previously copied sprite link's
+// id, so it animates to/from the copied sprite across frames.
+export const linkSpriteToCopied = () => ({
+  type: Actions.LINK_SPRITE_TO_COPIED,
 });
 
 export const addFrame = (frame: Frame, afterId?: number | string | null) => ({

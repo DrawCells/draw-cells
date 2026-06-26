@@ -23,7 +23,7 @@ const initialState: StateProps = {
 export default function FramesSidebar() {
   const dispatch = useDispatch();
   const isFramesSidebarOpen = useSelector(
-    (state: State) => state.sidebars.isFramesOpen
+    (state: State) => state.sidebars.isFramesOpen,
   );
   const currentFrame = useSelector((state: State) => state.frames.currentFrame);
   const [state, setState] = React.useState(initialState);
@@ -75,7 +75,7 @@ export default function FramesSidebar() {
       anchor="bottom"
       additionalTitle={
         <>
-          | <b>Frame {currentFrame.id}</b>
+          | <b>{currentFrame.title}</b>
         </>
       }
     >
@@ -97,7 +97,13 @@ export default function FramesSidebar() {
         >
           {framesList.map((f, index) => (
             <ListItem key={`frame-${f.id}`} style={{ width: "100%" }}>
-              <Frame id={f.id} title={f.title} preview={f.preview} index={index} onMove={handleMoveFrame} />
+              <Frame
+                id={f.id}
+                title={f.title}
+                preview={f.preview}
+                index={index}
+                onMove={handleMoveFrame}
+              />
             </ListItem>
           ))}
           <ListItem style={{ height: "100%" }}>

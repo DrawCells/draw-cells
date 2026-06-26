@@ -289,9 +289,13 @@ export default function PropertiesSidebar() {
             <TableRow key="id">
               <TableCell>id</TableCell>
               <TableCell>
+                {/* Ids are system-managed and globally unique; show them for
+                    reference but never let them be edited, otherwise sprites
+                    could collide or lose their identity across frames. */}
                 <Input
                   value={currentSprite?.id || ''}
-                  onChange={(e) => dispatch(updateAllSelectedSprites({field: 'id', value: e.target.value}))}
+                  readOnly
+                  disableUnderline
                 />
               </TableCell>
             </TableRow>

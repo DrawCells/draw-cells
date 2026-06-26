@@ -7,6 +7,8 @@ import {
   bringSpriteToFront,
   groupSprites,
   ungroupSprites,
+  copySpriteLink,
+  linkSpriteToCopied,
 } from "../../Frames/actions";
 import { Menu, MenuItem } from "@mui/material";
 import { useDispatch, useSelector } from "react-redux";
@@ -24,10 +26,18 @@ export default function ContextMenu({ menuState, setMenuState }: any) {
   const dispatch = useDispatch();
   const framesList = useSelector((state: State) => state.frames.frames);
   const currentSprites = useSelector((state: State) => state.frames.currentSprites);
+  const linkSourceId = useSelector((state: State) => state.frames.linkSourceId);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
 
   const canGroup = currentSprites.length >= 2;
   const canUngroup = currentSprites.some((s) => !!s.groupId);
+  // Linking is a one-to-one identity mapping, so it only applies to a single
+  // selected sprite.
+  const canCopyLink = currentSprites.length === 1;
+  const canLink =
+    currentSprites.length === 1 &&
+    linkSourceId != null &&
+    currentSprites[0].id !== linkSourceId;
 
   return (
     <>
@@ -72,6 +82,21 @@ export default function ContextMenu({ menuState, setMenuState }: any) {
         >
           Ungroup (⌘⇧G)
         </MenuItem>
+        <MenuItem
+          disabled={!canCopyLink}
+          onClick={() => {
+            dispatch(copySpriteLink(currentSprites[0].id));
+            handleClose();
+          }}
+        >
+          Copy sprite link
+        </MenuItem>
+        <MenuItem
+          disabled={!canLink}
+          onClick={() => { dispatch(linkSpriteToCopied()); handleClose(); }}
+        >
+          Link to copied sprite
+        </MenuItem>
       </Menu>
       <Menu open={!!anchorEl} anchorEl={anchorEl}>
         {framesList.map((f) => (
@@ -79,7 +104,7 @@ export default function ContextMenu({ menuState, setMenuState }: any) {
             key={`copy-selected-into-${f.id}`}
             onClick={() => dispatch(copySelectedSpriteSIntoFrame(f.id || ""))}
           >
-            Frame {f.id}
+            {f.title}
           </MenuItem>
         ))}
       </Menu>
