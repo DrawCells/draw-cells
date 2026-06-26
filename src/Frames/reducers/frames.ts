@@ -451,24 +451,27 @@ export const frames = (
   }
 
   if (type === Actions.SET_INITIAL_DATA) {
-    if (!payload.frames || payload.frames.length <= 0) {
-      return { ...initialState, title: payload.title };
+    // payload can be null when the presentation doesn't exist yet or the DB
+    // read returns nothing — fall back to a fresh empty presentation.
+    const data = payload || {};
+    if (!data.frames || data.frames.length <= 0) {
+      return { ...initialState, title: data.title };
     }
     const lastSpriteId = Math.max(
-      ...payload.frames.map((f: Frame) => {
+      ...data.frames.map((f: Frame) => {
         if (!f.sprites) return 1;
         return Math.max(...f.sprites.map((s) => parseInt(s.id.toString())));
       }),
     );
-    const nextFrame = computeNextFrame(payload.frames, payload.frames[0]);
+    const nextFrame = computeNextFrame(data.frames, data.frames[0]);
     return {
       ...initialState,
-      title: payload.title,
-      frames: payload.frames,
+      title: data.title,
+      frames: data.frames,
       lastSpriteId: lastSpriteId + 1,
       currentFrame: {
-        ...payload.frames[0],
-        sprites: payload.frames[0].sprites || [],
+        ...data.frames[0],
+        sprites: data.frames[0].sprites || [],
       },
       nextFrame: nextFrame,
     };
