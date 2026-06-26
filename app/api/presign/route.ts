@@ -10,23 +10,43 @@ const s3 = new S3Client({
   },
 });
 
+interface PresignFile {
+  filename: string;
+  filetype: string;
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { filename, filetype, presentationId } = await req.json();
+    const { files, presentationId } = await req.json();
 
-    const Key = `video-export-frames/${presentationId}/${Date.now()}-${filename}`;
+    if (!Array.isArray(files) || files.length === 0) {
+      return NextResponse.json(
+        { error: "Invalid files array" },
+        { status: 400 },
+      );
+    }
+
     const Bucket = process.env.AWS_S3_BUCKET_NAME!;
+    // Shared timestamp + index keeps keys unique within the batch.
+    const timestamp = Date.now();
 
-    // Generate presigned PUT URL
-    const command = new PutObjectCommand({
-      Bucket,
-      Key,
-      ContentType: filetype,
-    });
+    // Presign a batch of PUT URLs in one round-trip. Signing is CPU-only (no
+    // network), so it parallelizes cheaply. Each URL is valid for 5 minutes,
+    // which comfortably covers a single upload chunk on the client.
+    const items = await Promise.all(
+      (files as PresignFile[]).map(async ({ filename, filetype }, index) => {
+        const Key = `video-export-frames/${presentationId}/${timestamp}-${index}-${filename}`;
+        const command = new PutObjectCommand({
+          Bucket,
+          Key,
+          ContentType: filetype,
+        });
+        const url = await getSignedUrl(s3, command, { expiresIn: 300 });
+        return { url, key: Key };
+      }),
+    );
 
-    const url = await getSignedUrl(s3, command, { expiresIn: 120 }); // valid for 120s
-
-    return NextResponse.json({ url, key: Key });
+    return NextResponse.json({ items });
   } catch (err: any) {
     console.error(err);
     return NextResponse.json({ error: err.message }, { status: 500 });

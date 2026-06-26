@@ -13,6 +13,43 @@ export function arrowGeometry(width: number, height: number) {
   };
 }
 
+// App-wide cache of loaded source images keyed by their original sprite URL, so
+// each image is signed and downloaded once and the resulting HTMLImageElement is
+// reused everywhere it is rendered (editing canvas, frame thumbnails, video
+// export). Without this the video export re-signs and re-downloads each image on
+// every one of its thousands of interpolated frames, which makes export appear
+// to hang while it floods the network with requests.
+const imageCache = new Map<string, Promise<HTMLImageElement | null>>();
+
+export function loadSpriteImage(
+  url: string,
+): Promise<HTMLImageElement | null> {
+  if (!url) return Promise.resolve(null);
+
+  const cached = imageCache.get(url);
+  if (cached) return cached;
+
+  const promise = (async () => {
+    const src = await resolveImageUrl(url);
+    if (!src) return null;
+    return new Promise<HTMLImageElement | null>((resolve) => {
+      const img = new window.Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = src;
+    });
+  })().catch(() => null);
+
+  // If loading ultimately fails, drop the entry so a later render can retry.
+  promise.then((img) => {
+    if (!img) imageCache.delete(url);
+  });
+
+  imageCache.set(url, promise);
+  return promise;
+}
+
 // Adds a single sprite (image or text) to a Konva layer, mirroring how the
 // editing canvas renders it. Used for frame thumbnails and video export so the
 // rendering stays in one place.
@@ -65,30 +102,21 @@ export async function addSpriteToLayer(
     return;
   }
 
-  const src = await resolveImageUrl(s.backgroundUrl || "");
-  if (!src) return;
-  await new Promise<void>((resolve) => {
-    const img = new window.Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      layer.add(
-        new Konva.Image({
-          x: s.position.x,
-          y: s.position.y,
-          image: img,
-          width: s.width,
-          height: s.height,
-          rotation: s.rotation,
-          offsetX: s.width / 2,
-          offsetY: s.height / 2,
-          opacity: s.opacity ?? 1,
-        }),
-      );
-      resolve();
-    };
-    img.onerror = () => resolve();
-    img.src = src;
-  });
+  const img = await loadSpriteImage(s.backgroundUrl || "");
+  if (!img) return;
+  layer.add(
+    new Konva.Image({
+      x: s.position.x,
+      y: s.position.y,
+      image: img,
+      width: s.width,
+      height: s.height,
+      rotation: s.rotation,
+      offsetX: s.width / 2,
+      offsetY: s.height / 2,
+      opacity: s.opacity ?? 1,
+    }),
+  );
 }
 
 export async function renderFrameToDataUrl(sprites: Sprite[]): Promise<string> {

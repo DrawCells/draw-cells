@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { animated, to, useSpring } from "@react-spring/konva";
 import { Arrow } from "react-konva";
-import { arrowGeometry, resolveImageUrl } from "../helpers";
+import { arrowGeometry, loadSpriteImage } from "../helpers";
 
 // Animated wrapper so the arrow's rotation/scale/opacity tween like the image
 // and text nodes (which use svgProps).
@@ -176,13 +176,8 @@ export default function AnimationSprite(props) {
   useEffect(() => {
     if (!backgroundUrl) return;
     let cancelled = false;
-    resolveImageUrl(backgroundUrl).then((src) => {
-      if (cancelled || !src) return;
-      const newImg = new window.Image();
-      newImg.crossOrigin = "anonymous";
-      newImg.src = src;
-      newImg.onload = () => { if (!cancelled) setImg(newImg); };
-      newImg.onerror = (err) => console.error("Error loading image", err);
+    loadSpriteImage(backgroundUrl).then((newImg) => {
+      if (!cancelled && newImg) setImg(newImg);
     });
     return () => { cancelled = true; };
   }, [backgroundUrl]);

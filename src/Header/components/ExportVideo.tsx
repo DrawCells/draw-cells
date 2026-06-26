@@ -1,5 +1,8 @@
 import { Button, Menu, MenuItem } from "@mui/material";
 import { useState } from "react";
+import ExportProgressDialog, {
+  ExportProgress,
+} from "./ExportProgressDialog";
 import { useSelector } from "react-redux";
 import State from "../../stateInterface";
 import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH } from "../../constants";
@@ -8,32 +11,84 @@ import Konva from "konva";
 import ArrowDropDown from "@mui/icons-material/ArrowDropDown";
 import { addSpriteToLayer, renderFrameToDataUrl } from "../../helpers";
 
-async function uploadImage(file: File, presentationId: string) {
-  // Step 1: get a presigned URL
+// Frames are rendered, presigned, and uploaded one chunk at a time. This caps
+// how many frame blobs live in memory at once, keeps S3 PUTs within the signed
+// URL's lifetime, and bounds upload concurrency so a large export no longer
+// fires thousands of simultaneous requests.
+const CHUNK_SIZE = 25;
+const UPLOAD_CONCURRENCY = 6;
+const MAX_UPLOAD_RETRIES = 3;
+
+interface PresignedItem {
+  url: string;
+  key: string;
+}
+
+interface FrameSpec {
+  filename: string;
+  sprites: Sprite[];
+}
+
+// Runs `worker` over `items` with at most `concurrency` in flight at a time,
+// preserving result order.
+async function runWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  const runners = Array.from(
+    { length: Math.min(concurrency, items.length) },
+    async () => {
+      while (next < items.length) {
+        const index = next++;
+        results[index] = await worker(items[index], index);
+      }
+    },
+  );
+  await Promise.all(runners);
+  return results;
+}
+
+async function presignBatch(
+  files: { filename: string; filetype: string }[],
+  presentationId: string,
+): Promise<PresignedItem[]> {
   const res = await fetch("/api/presign", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      filename: file.name,
-      filetype: file.type,
-      presentationId,
-    }),
+    body: JSON.stringify({ files, presentationId }),
   });
+  if (!res.ok) throw new Error(`Presign failed: ${res.status}`);
+  const { items } = await res.json();
+  return items;
+}
 
-  const { url, key } = await res.json();
+async function putWithRetry(url: string, blob: Blob): Promise<void> {
+  const contentType = blob.type || "image/png";
+  let lastError: unknown;
+  for (let attempt = 0; attempt < MAX_UPLOAD_RETRIES; attempt++) {
+    try {
+      const upload = await fetch(url, {
+        method: "PUT",
+        headers: { "Content-Type": contentType },
+        body: blob,
+      });
+      if (upload.ok) return;
+      lastError = new Error(`Upload failed: ${upload.status}`);
+    } catch (err) {
+      lastError = err;
+    }
+    // Linear backoff before retrying.
+    await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+  }
+  throw lastError ?? new Error("Upload failed");
+}
 
-  // Step 2: upload directly to S3
-  const upload = await fetch(url, {
-    method: "PUT",
-    headers: { "Content-Type": file.type },
-    body: file,
-  });
-
-  if (!upload.ok) throw new Error("Upload failed");
-
-  const fileUrl = `https://${process.env.NEXT_PUBLIC_S3_BUCKET!}.s3.${process
-    .env.NEXT_PUBLIC_AWS_REGION!}.amazonaws.com/${key}`;
-  return fileUrl;
+function publicUrlForKey(key: string): string {
+  return `https://${process.env.NEXT_PUBLIC_S3_BUCKET!}.s3.${process.env
+    .NEXT_PUBLIC_AWS_REGION!}.amazonaws.com/${key}`;
 }
 
 export default function ExportVideo({
@@ -43,6 +98,13 @@ export default function ExportVideo({
 }) {
   const [isExporting, setIsExporting] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [progress, setProgress] = useState<ExportProgress | null>(null);
+
+  // Clears all export UI state. Called from every terminal path of an export.
+  const finishExport = () => {
+    setIsExporting(false);
+    setProgress(null);
+  };
 
   const frames = useSelector((state: State) => state.frames.frames);
   const currentFrame = useSelector((state: State) => state.frames.currentFrame);
@@ -100,7 +162,7 @@ export default function ExportVideo({
     setIsExporting(true);
     setAnchorEl(null);
     const stage = createStage();
-    const files = [];
+    const frameSpecs: FrameSpec[] = [];
 
     for (let frameIdx = 0; frameIdx < frames.length - 1; frameIdx++) {
       const frame = frames[frameIdx];
@@ -234,22 +296,53 @@ export default function ExportVideo({
           }
         }
 
-        const newFrame: Blob = await renderSprites(stage, newSprites);
         const filename = `frame-${String(frameIdx).padStart(4, "0")}-${String(
           i,
         ).padStart(4, "0")}.png`;
-        const file = new File([newFrame], filename, {
-          type: newFrame.type || "image/png",
-        });
-        files.push(file);
+        frameSpecs.push({ filename, sprites: newSprites });
       }
     }
 
-    const frameURLs = await Promise.all(
-      files.map((file) => uploadImage(file, presentationId)),
-    );
-
     try {
+      setProgress({ phase: "uploading", uploaded: 0, total: frameSpecs.length });
+
+      // Render, presign, and upload one chunk at a time so peak memory stays
+      // bounded and each presigned URL is used well within its lifetime.
+      const frameURLs: string[] = [];
+      for (let start = 0; start < frameSpecs.length; start += CHUNK_SIZE) {
+        const chunk = frameSpecs.slice(start, start + CHUNK_SIZE);
+
+        // Rendering shares one Konva stage, so it must stay sequential.
+        const blobs: Blob[] = [];
+        for (const spec of chunk) {
+          blobs.push(await renderSprites(stage, spec.sprites));
+        }
+
+        const presigned = await presignBatch(
+          chunk.map((spec) => ({
+            filename: spec.filename,
+            filetype: "image/png",
+          })),
+          presentationId,
+        );
+
+        await runWithConcurrency(chunk, UPLOAD_CONCURRENCY, async (_, idx) => {
+          await putWithRetry(presigned[idx].url, blobs[idx]);
+          setProgress((p) =>
+            p?.phase === "uploading"
+              ? { ...p, uploaded: p.uploaded + 1 }
+              : p,
+          );
+        });
+
+        for (const item of presigned) {
+          frameURLs.push(publicUrlForKey(item.key));
+        }
+      }
+
+      // Frames are uploaded; the server now encodes the video.
+      setProgress({ phase: "processing" });
+
       const response = await fetch("/api/export-video", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -269,7 +362,7 @@ export default function ExportVideo({
 
           if (job.status === "completed") {
             clearInterval(poll);
-            setIsExporting(false);
+            finishExport();
             const videoRes = await fetch(job.videoUrl);
             const blob = await videoRes.blob();
             const blobUrl = URL.createObjectURL(blob);
@@ -282,18 +375,18 @@ export default function ExportVideo({
             URL.revokeObjectURL(blobUrl);
           } else if (job.status === "failed") {
             clearInterval(poll);
-            setIsExporting(false);
+            finishExport();
             console.error("Export failed:", job.error);
           }
         } catch (pollError) {
           clearInterval(poll);
-          setIsExporting(false);
+          finishExport();
           console.error("Error polling export status:", pollError);
         }
       }, 3000);
     } catch (error) {
       console.error("Error exporting video:", error);
-      setIsExporting(false);
+      finishExport();
     } finally {
       stage.destroy();
     }
@@ -346,6 +439,7 @@ export default function ExportVideo({
         </MenuItem>
         <MenuItem onClick={handleExportFrame}>Export Frame as Image</MenuItem>
       </Menu>
+      <ExportProgressDialog progress={progress} />
     </>
   );
 }

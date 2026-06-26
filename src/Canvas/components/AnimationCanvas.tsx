@@ -37,7 +37,7 @@ import CanvasSprite from "../../Sprites/CanvasSprite";
 import CanvasText from "../../Sprites/CanvasText";
 import CanvasArrow from "../../Sprites/CanvasArrow";
 import State from "../../stateInterface";
-import { renderFrameToDataUrl, resolveImageUrl } from "../../helpers";
+import { renderFrameToDataUrl, loadSpriteImage } from "../../helpers";
 import { zoomIn, zoomOut } from "../actions";
 import AnimationCanvasPreview from "./AnimationCanvasPreview";
 import ContextMenu from "./ContextMenu";
@@ -108,13 +108,20 @@ function AnimationCanvas() {
 
   const viewportRef: any = useRef(null);
 
+  // Guards the debounced save so it can never overwrite the DB with the
+  // default (empty) state before the initial load for this presentation
+  // has completed. Reset on every presentation change.
+  const hasLoadedRef = useRef(false);
+
   // LOADING FROM DB
   const [isLoading, setIsLoading] = useState(false);
   useEffect(() => {
+    hasLoadedRef.current = false;
     setIsLoading(true);
     const getData = async () => {
       const res = await get(ref(db, `presentations/${presentationId}`));
       dispatch(loadInitialData(res.val()));
+      hasLoadedRef.current = true;
       setIsLoading(false);
 
       const scrollX =
@@ -136,6 +143,10 @@ function AnimationCanvas() {
 
   // DEBOUNCED SAVE TO DB
   useEffect(() => {
+    // Don't save until the initial load has populated the store, otherwise
+    // a save scheduled on mount would overwrite the saved frames with the
+    // default empty state.
+    if (!hasLoadedRef.current) return;
     dispatch(setIsFramesSaving(true));
     const t = setTimeout(async () => {
       await fetch("/api/presentations/save", {
@@ -159,19 +170,13 @@ function AnimationCanvas() {
   useEffect(() => {
     if (!currentFrameBgUrl) return;
     let cancelled = false;
-    resolveImageUrl(currentFrameBgUrl).then((src) => {
-      if (cancelled || !src) return;
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.src = src;
-      img.onload = () => {
-        if (cancelled) return;
-        viewportRef.current.fillPatternImage(img);
-        viewportRef.current.fillPatternScale({
-          x: VIEWPORT_WIDTH / img.width,
-          y: VIEWPORT_HEIGHT / img.height,
-        });
-      };
+    loadSpriteImage(currentFrameBgUrl).then((img) => {
+      if (cancelled || !img) return;
+      viewportRef.current.fillPatternImage(img);
+      viewportRef.current.fillPatternScale({
+        x: VIEWPORT_WIDTH / img.width,
+        y: VIEWPORT_HEIGHT / img.height,
+      });
     });
     return () => {
       cancelled = true;
