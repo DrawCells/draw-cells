@@ -1,5 +1,8 @@
 import { Button, Menu, MenuItem } from "@mui/material";
 import { useState } from "react";
+import ExportProgressDialog, {
+  ExportProgress,
+} from "./ExportProgressDialog";
 import { useSelector } from "react-redux";
 import State from "../../stateInterface";
 import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH } from "../../constants";
@@ -95,6 +98,13 @@ export default function ExportVideo({
 }) {
   const [isExporting, setIsExporting] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [progress, setProgress] = useState<ExportProgress | null>(null);
+
+  // Clears all export UI state. Called from every terminal path of an export.
+  const finishExport = () => {
+    setIsExporting(false);
+    setProgress(null);
+  };
 
   const frames = useSelector((state: State) => state.frames.frames);
   const currentFrame = useSelector((state: State) => state.frames.currentFrame);
@@ -294,6 +304,8 @@ export default function ExportVideo({
     }
 
     try {
+      setProgress({ phase: "uploading", uploaded: 0, total: frameSpecs.length });
+
       // Render, presign, and upload one chunk at a time so peak memory stays
       // bounded and each presigned URL is used well within its lifetime.
       const frameURLs: string[] = [];
@@ -314,14 +326,22 @@ export default function ExportVideo({
           presentationId,
         );
 
-        await runWithConcurrency(chunk, UPLOAD_CONCURRENCY, (_, idx) =>
-          putWithRetry(presigned[idx].url, blobs[idx]),
-        );
+        await runWithConcurrency(chunk, UPLOAD_CONCURRENCY, async (_, idx) => {
+          await putWithRetry(presigned[idx].url, blobs[idx]);
+          setProgress((p) =>
+            p?.phase === "uploading"
+              ? { ...p, uploaded: p.uploaded + 1 }
+              : p,
+          );
+        });
 
         for (const item of presigned) {
           frameURLs.push(publicUrlForKey(item.key));
         }
       }
+
+      // Frames are uploaded; the server now encodes the video.
+      setProgress({ phase: "processing" });
 
       const response = await fetch("/api/export-video", {
         method: "POST",
@@ -342,7 +362,7 @@ export default function ExportVideo({
 
           if (job.status === "completed") {
             clearInterval(poll);
-            setIsExporting(false);
+            finishExport();
             const videoRes = await fetch(job.videoUrl);
             const blob = await videoRes.blob();
             const blobUrl = URL.createObjectURL(blob);
@@ -355,18 +375,18 @@ export default function ExportVideo({
             URL.revokeObjectURL(blobUrl);
           } else if (job.status === "failed") {
             clearInterval(poll);
-            setIsExporting(false);
+            finishExport();
             console.error("Export failed:", job.error);
           }
         } catch (pollError) {
           clearInterval(poll);
-          setIsExporting(false);
+          finishExport();
           console.error("Error polling export status:", pollError);
         }
       }, 3000);
     } catch (error) {
       console.error("Error exporting video:", error);
-      setIsExporting(false);
+      finishExport();
     } finally {
       stage.destroy();
     }
@@ -419,6 +439,7 @@ export default function ExportVideo({
         </MenuItem>
         <MenuItem onClick={handleExportFrame}>Export Frame as Image</MenuItem>
       </Menu>
+      <ExportProgressDialog progress={progress} />
     </>
   );
 }
