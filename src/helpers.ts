@@ -2,6 +2,22 @@ import Konva from "konva";
 import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH } from "./constants";
 import { isArrowSprite, isTextSprite, Sprite } from "./Frames/reducers/frames";
 
+// Generates a globally-unique, opaque id for sprites and frames. Using a UUID
+// (instead of a monotonic counter derived from array order or the max existing
+// id) means ids never collide regardless of reordering, deletion, cloning, or
+// how many entities are created between renders. Ids are treated as opaque
+// strings everywhere (compared via toString), so they never need to be parsed.
+export function generateId(): string {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
+    return crypto.randomUUID();
+  }
+  // Fallback for environments without crypto.randomUUID (e.g. older test envs).
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 // Derives the Konva Arrow geometry for an arrow sprite from its bounding box:
 // a horizontal arrow across the box with the head sized to the box height.
 export function arrowGeometry(width: number, height: number) {

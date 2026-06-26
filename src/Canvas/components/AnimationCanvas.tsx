@@ -78,7 +78,6 @@ function AnimationCanvas() {
   const selectedSprites = useSelector(
     (state: State) => state.frames.currentSprites,
   );
-  const lastSpriteId = useSelector((state: State) => state.frames.lastSpriteId);
   const isSpritesSidebarOpen = useSelector(
     (state: State) => state.sidebars.isSpritesOpen,
   );
@@ -252,7 +251,6 @@ function AnimationCanvas() {
       const height = r >= 1 ? BASE : BASE / r;
       dispatch(
         addSprite({
-          id: lastSpriteId,
           position: pos,
           backgroundUrl,
           width,
@@ -267,7 +265,6 @@ function AnimationCanvas() {
     if (!pos) return;
     dispatch(
       addSprite({
-        id: lastSpriteId,
         kind: "text",
         text: "Text",
         fontSize: 24,
@@ -286,7 +283,6 @@ function AnimationCanvas() {
     if (!pos) return;
     dispatch(
       addSprite({
-        id: lastSpriteId,
         kind: "arrow",
         stroke: "#000000",
         position: pos,

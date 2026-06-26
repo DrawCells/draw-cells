@@ -1,5 +1,16 @@
 import { Frame, Sprite } from "../reducers/frames";
 
+// Distributive Omit so that omitting "id" from the Sprite union preserves each
+// member (image/text/arrow) and its discriminant, rather than collapsing to the
+// members' common keys.
+type DistributiveOmit<T, K extends keyof any> = T extends any
+  ? Omit<T, K>
+  : never;
+
+// The reducer is the single source of truth for sprite ids and assigns one on
+// ADD_SPRITE, so callers create sprites without supplying an id.
+export type NewSprite = DistributiveOmit<Sprite, "id">;
+
 export const Actions = {
   SET_INITIAL_DATA: "SET_INITIAL_DATA",
   SET_CURRENT_FRAME: "SET_CURRENT_FRAME",
@@ -41,7 +52,7 @@ export const loadInitialData = (payload: any) => ({
   payload,
 });
 
-export const addSprite = (sprite: Sprite) => ({
+export const addSprite = (sprite: NewSprite) => ({
   type: Actions.ADD_SPRITE,
   payload: sprite,
 });

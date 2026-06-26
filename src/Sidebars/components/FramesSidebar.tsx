@@ -30,23 +30,16 @@ export default function FramesSidebar() {
   const framesList = useSelector((state: State) => state.frames.frames);
 
   const handleAddFrame = () => {
-    const newFrameId =
-      parseInt(framesList[framesList.length - 1]?.id?.toString() || "0") + 1;
-    const newFrame = {
-      id: newFrameId,
-      title: `Frame ${newFrameId}`,
-      sprites: [],
-    };
+    // The reducer assigns the frame's id and title from full state.
+    const newFrame = { id: "", title: "", sprites: [] };
     dispatch(addFrame(newFrame));
     handleClose();
   };
 
   const handleCloneSelected = () => {
-    const newFrameId =
-      parseInt(framesList[framesList.length - 1]?.id?.toString() || "0") + 1;
     const newFrame = {
-      id: newFrameId,
-      title: `Frame ${newFrameId}`,
+      id: "",
+      title: "",
       sprites: structuredClone(currentFrame.sprites),
     };
     dispatch(addFrame(newFrame, currentFrame.id));

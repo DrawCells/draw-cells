@@ -1,8 +1,8 @@
-import { getRndInteger } from "../../helpers";
+import { generateId, getRndInteger } from "../../helpers";
 import { Actions } from "../actions";
 
 const initialFrame = {
-  id: 1,
+  id: generateId(),
   title: "Frame 1",
   sprites: [],
 };
@@ -13,7 +13,6 @@ const initialState: FramesState = {
   prevFrame: null,
   nextFrame: null,
   currentSprites: [],
-  lastSpriteId: 1,
   title: "",
   isFramesSaving: false,
   _past: [],
@@ -101,7 +100,6 @@ export interface Frame {
 interface FramesSnapshot {
   frames: Array<Frame>;
   currentFrame: Frame;
-  lastSpriteId: number;
 }
 
 const MAX_HISTORY = 50;
@@ -112,7 +110,6 @@ export interface FramesState {
   prevFrame: Frame | null;
   nextFrame: Frame | null;
   currentSprites: Array<Sprite>;
-  lastSpriteId: number;
   title: string;
   isFramesSaving?: boolean;
   _past: Array<FramesSnapshot>;
@@ -446,8 +443,19 @@ const TRACKED_ACTIONS = new Set([
 const snapshot = (state: FramesState): FramesSnapshot => ({
   frames: state.frames,
   currentFrame: state.currentFrame,
-  lastSpriteId: state.lastSpriteId,
 });
+
+// Computes the next sequential "Frame N" label. N is one past the highest
+// number already used by an existing "Frame N" title, so labels stay monotonic
+// and never collide even after frames are deleted or reordered (counting frames
+// would reuse a number after a deletion).
+const nextFrameTitle = (frames: Array<Frame>): string => {
+  const highest = frames.reduce((max, f) => {
+    const match = /^Frame (\d+)$/.exec(f.title ?? "");
+    return match ? Math.max(max, parseInt(match[1], 10)) : max;
+  }, 0);
+  return `Frame ${highest + 1}`;
+};
 
 const restoreSnapshot = (state: FramesState, snap: FramesSnapshot): FramesState => {
   const nextFrame = computeNextFrame(snap.frames, snap.currentFrame);
@@ -455,7 +463,6 @@ const restoreSnapshot = (state: FramesState, snap: FramesSnapshot): FramesState 
     ...state,
     frames: snap.frames,
     currentFrame: snap.currentFrame,
-    lastSpriteId: snap.lastSpriteId,
     nextFrame,
     currentSprites: [],
   };
@@ -496,18 +503,11 @@ export const frames = (
     if (!data.frames || data.frames.length <= 0) {
       return { ...initialState, title: data.title };
     }
-    const lastSpriteId = Math.max(
-      ...data.frames.map((f: Frame) => {
-        if (!f.sprites) return 1;
-        return Math.max(...f.sprites.map((s) => parseInt(s.id.toString())));
-      }),
-    );
     const nextFrame = computeNextFrame(data.frames, data.frames[0]);
     return {
       ...initialState,
       title: data.title,
       frames: data.frames,
-      lastSpriteId: lastSpriteId + 1,
       currentFrame: {
         ...data.frames[0],
         sprites: data.frames[0].sprites || [],
@@ -525,7 +525,6 @@ export const frames = (
   const result = ((): FramesState => {
     switch (type) {
     case Actions.ADD_SPRITE: {
-      console.log("Adding sprite with payload:", payload);
       const newSprite = {
         duration: 1,
         minTravelDistance: 15,
@@ -540,6 +539,10 @@ export const frames = (
         width: payload.width || 50,
         height: payload.height || 50,
         ...payload,
+        // The reducer is the single source of truth for ids: always assign a
+        // fresh unique id, ignoring any id the caller may have supplied, so two
+        // sprites can never share an id.
+        id: generateId(),
       };
       const crtFrame = {
         ...state.currentFrame,
@@ -551,7 +554,6 @@ export const frames = (
         ...state,
         frames: newFrames,
         currentFrame: newCurrentFrame,
-        lastSpriteId: state.lastSpriteId + 1,
       };
     }
     case Actions.UPDATE_ALL_SELECTED_SPRITES: {
@@ -762,7 +764,15 @@ export const frames = (
       return { ...state };
     }
     case Actions.ADD_FRAME: {
-      const { frame, afterId } = payload;
+      const { frame: incomingFrame, afterId } = payload;
+      // Assign the new frame's id and title here so both are derived from full
+      // state: the id is globally unique and the title is the next sequential
+      // "Frame N" rather than something computed from array order in the UI.
+      const frame = {
+        ...incomingFrame,
+        id: generateId(),
+        title: nextFrameTitle(state.frames),
+      };
       let baseFrames: Array<Frame>;
       if (afterId != null) {
         const insertAt = state.frames.findIndex((f) => f.id === afterId);
@@ -791,7 +801,6 @@ export const frames = (
           prevFrame: null,
           nextFrame: null,
           currentSprites: [],
-          lastSpriteId: 1,
         };
       }
 
