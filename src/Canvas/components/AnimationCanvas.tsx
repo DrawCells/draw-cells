@@ -747,6 +747,23 @@ function AnimationCanvas() {
                         </React.Fragment>
                       );
                     })}
+                    {selectedSprites.length > 1 &&
+                      selectedSprites.map((s: Sprite) => (
+                        <Rect
+                          key={`sprite-highlight-${s.id}`}
+                          x={s.position.x}
+                          y={s.position.y}
+                          width={s.width}
+                          height={s.height}
+                          offsetX={s.width / 2}
+                          offsetY={s.height / 2}
+                          rotation={s.rotation}
+                          stroke="rgba(0, 161, 255, 0.9)"
+                          strokeWidth={1 / scale}
+                          fill="rgba(0, 161, 255, 0.08)"
+                          listening={false}
+                        />
+                      ))}
                     {[...new Set(selectedSprites.map((s) => s.groupId).filter(Boolean))].map((gid) => {
                       const members = sprites?.filter((s: Sprite) => s.groupId === gid) || [];
                       if (members.length === 0) return null;

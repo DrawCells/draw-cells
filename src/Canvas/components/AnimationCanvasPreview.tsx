@@ -85,6 +85,11 @@ export default function AnimationCanvasPreview({
     otherPoints = [midX, midY, x2, y2];
   }
 
+  const points = [x1, y1, ...otherPoints];
+  if (points.some((p) => typeof p !== "number" || Number.isNaN(p))) {
+    return <></>;
+  }
+
   return (
     <>
       {animationType === "CIRCULAR" && (
@@ -106,7 +111,7 @@ export default function AnimationCanvasPreview({
         </>
       )}
       <Arrow
-        points={[x1, y1, ...otherPoints]}
+        points={points}
         tension={tension}
         pointerLength={10}
         pointerWidth={10}
