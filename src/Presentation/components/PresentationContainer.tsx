@@ -92,6 +92,7 @@ const PresentationContainer = ({
                   text={isTextSprite(s) ? s.text : undefined}
                   fontSize={isTextSprite(s) ? s.fontSize : undefined}
                   fontFamily={isTextSprite(s) ? s.fontFamily : undefined}
+                  fontStyle={isTextSprite(s) ? s.fontStyle : undefined}
                   fill={isTextSprite(s) ? s.fill : undefined}
                   align={isTextSprite(s) ? s.align : undefined}
                   stroke={isArrowSprite(s) ? s.stroke : undefined}

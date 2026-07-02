@@ -33,6 +33,7 @@ export default function AnimationSprite(props) {
     text,
     fontSize,
     fontFamily,
+    fontStyle,
     fill,
     align,
     stroke,
@@ -203,6 +204,7 @@ export default function AnimationSprite(props) {
           text={text}
           fontSize={fontSize}
           fontFamily={fontFamily || "Arial"}
+          fontStyle={fontStyle || "normal"}
           fill={fill || "#000000"}
           align={align || "left"}
           verticalAlign="middle"
