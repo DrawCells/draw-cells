@@ -10,6 +10,7 @@ interface User {
   uid: string;
   email: string | null;
   displayName: string | null;
+  isAdmin?: boolean;
 }
 
 interface HomeProps {

@@ -17,3 +17,23 @@ export async function getSessionUser() {
     return null;
   }
 }
+
+// Comma-separated allowlist of admin emails, e.g. "a@x.com, b@y.com".
+function getAdminEmails(): string[] {
+  return (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export function isAdminEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return getAdminEmails().includes(email.toLowerCase());
+}
+
+// Returns the current session user only if they are an admin, otherwise null.
+export async function getAdminUser() {
+  const user = await getSessionUser();
+  if (!user || !isAdminEmail(user.email)) return null;
+  return user;
+}

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import React, { Suspense } from "react";
-import { getSessionUser } from "../lib/auth";
+import { getSessionUser, isAdminEmail } from "../lib/auth";
 import { db } from "../lib/firebaseAdmin";
 import Home from "../src/Home/components/Home";
 
@@ -15,7 +15,10 @@ export default async function HomePage() {
 
   return (
     <Suspense>
-      <Home user={user} presentations={presentations} />
+      <Home
+        user={{ ...user, isAdmin: isAdminEmail(user.email) }}
+        presentations={presentations}
+      />
     </Suspense>
   );
 }

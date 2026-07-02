@@ -104,6 +104,16 @@ const HomeHeader = () => {
               onClose={handleClose}
             >
               <MenuItem onClick={handleClose}>Profile</MenuItem>
+              {user.isAdmin && (
+                <MenuItem
+                  onClick={() => {
+                    handleClose();
+                    router.push("/admin");
+                  }}
+                >
+                  Admin
+                </MenuItem>
+              )}
               <MenuItem onClick={handleLogOut}>Log out</MenuItem>
             </Menu>
           </>
