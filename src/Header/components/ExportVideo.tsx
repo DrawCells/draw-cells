@@ -9,7 +9,7 @@ import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH } from "../../constants";
 import { Sprite } from "../../Frames/reducers/frames";
 import Konva from "konva";
 import ArrowDropDown from "@mui/icons-material/ArrowDropDown";
-import { addSpriteToLayer, renderFrameToDataUrl } from "../../helpers";
+import { addSpritesToLayer, renderFrameToDataUrl } from "../../helpers";
 
 // Frames are rendered, presigned, and uploaded one chunk at a time. This caps
 // how many frame blobs live in memory at once, keeps S3 PUTs within the signed
@@ -142,9 +142,7 @@ export default function ExportVideo({
     layer.add(background);
     background.moveToBottom();
 
-    await Promise.all(
-      sprites.map((s) => addSpriteToLayer(layer, s)),
-    );
+    await addSpritesToLayer(layer, sprites);
 
     stage.draw();
     const canvas = stage.toCanvas({ pixelRatio: 2 });

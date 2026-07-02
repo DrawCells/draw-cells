@@ -69,70 +69,78 @@ export function loadSpriteImage(
 // Adds a single sprite (image or text) to a Konva layer, mirroring how the
 // editing canvas renders it. Used for frame thumbnails and video export so the
 // rendering stays in one place.
-export async function addSpriteToLayer(
-  layer: Konva.Layer,
-  s: Sprite,
-): Promise<void> {
+// Builds the Konva node for a sprite. Image sprites resolve asynchronously
+// (their bitmap has to load), so this is separated from adding the node to the
+// layer: callers await all nodes in parallel, then add them in array order so
+// z-ordering (bring-to-front / send-to-back) is preserved. Adding directly here
+// would place synchronously-created text/arrow nodes before images that finish
+// loading later, silently reordering the stack.
+export async function createSpriteNode(s: Sprite): Promise<Konva.Shape | null> {
   if (isTextSprite(s)) {
-    layer.add(
-      new Konva.Text({
-        x: s.position.x,
-        y: s.position.y,
-        text: s.text,
-        fontSize: s.fontSize,
-        fontFamily: s.fontFamily || "Arial",
-        fontStyle: s.fontStyle || "normal",
-        fill: s.fill || "#000000",
-        align: s.align || "left",
-        verticalAlign: "middle",
-        wrap: "word",
-        width: s.width,
-        height: s.height,
-        offsetX: s.width / 2,
-        offsetY: s.height / 2,
-        rotation: s.rotation,
-        opacity: s.opacity ?? 1,
-      }),
-    );
-    return;
+    return new Konva.Text({
+      x: s.position.x,
+      y: s.position.y,
+      text: s.text,
+      fontSize: s.fontSize,
+      fontFamily: s.fontFamily || "Arial",
+      fontStyle: s.fontStyle || "normal",
+      fill: s.fill || "#000000",
+      align: s.align || "left",
+      verticalAlign: "middle",
+      wrap: "word",
+      width: s.width,
+      height: s.height,
+      offsetX: s.width / 2,
+      offsetY: s.height / 2,
+      rotation: s.rotation,
+      opacity: s.opacity ?? 1,
+    });
   }
 
   if (isArrowSprite(s)) {
     const geom = arrowGeometry(s.width, s.height);
-    layer.add(
-      new Konva.Arrow({
-        x: s.position.x,
-        y: s.position.y,
-        points: geom.points,
-        stroke: s.stroke || "#000000",
-        fill: s.stroke || "#000000",
-        strokeWidth: geom.strokeWidth,
-        pointerWidth: geom.pointerWidth,
-        pointerLength: geom.pointerLength,
-        offsetX: s.width / 2,
-        offsetY: s.height / 2,
-        rotation: s.rotation,
-        opacity: s.opacity ?? 1,
-      }),
-    );
-    return;
+    return new Konva.Arrow({
+      x: s.position.x,
+      y: s.position.y,
+      points: geom.points,
+      stroke: s.stroke || "#000000",
+      fill: s.stroke || "#000000",
+      strokeWidth: geom.strokeWidth,
+      pointerWidth: geom.pointerWidth,
+      pointerLength: geom.pointerLength,
+      offsetX: s.width / 2,
+      offsetY: s.height / 2,
+      rotation: s.rotation,
+      opacity: s.opacity ?? 1,
+    });
   }
 
   const img = await loadSpriteImage(s.backgroundUrl || "");
-  if (!img) return;
-  layer.add(
-    new Konva.Image({
-      x: s.position.x,
-      y: s.position.y,
-      image: img,
-      width: s.width,
-      height: s.height,
-      rotation: s.rotation,
-      offsetX: s.width / 2,
-      offsetY: s.height / 2,
-      opacity: s.opacity ?? 1,
-    }),
-  );
+  if (!img) return null;
+  return new Konva.Image({
+    x: s.position.x,
+    y: s.position.y,
+    image: img,
+    width: s.width,
+    height: s.height,
+    rotation: s.rotation,
+    offsetX: s.width / 2,
+    offsetY: s.height / 2,
+    opacity: s.opacity ?? 1,
+  });
+}
+
+// Adds sprites to the layer preserving their array order (= z-order). Nodes are
+// created/loaded in parallel, then added sequentially so images that load later
+// don't jump above earlier text/arrow sprites.
+export async function addSpritesToLayer(
+  layer: Konva.Layer,
+  sprites: Sprite[],
+): Promise<void> {
+  const nodes = await Promise.all(sprites.map((s) => createSpriteNode(s)));
+  for (const node of nodes) {
+    if (node) layer.add(node);
+  }
 }
 
 export async function renderFrameToDataUrl(sprites: Sprite[]): Promise<string> {
@@ -149,7 +157,7 @@ export async function renderFrameToDataUrl(sprites: Sprite[]): Promise<string> {
   layer.add(background);
   background.moveToBottom();
 
-  await Promise.all(sprites.map((s) => addSpriteToLayer(layer, s)));
+  await addSpritesToLayer(layer, sprites);
 
   stage.draw();
   const dataUrl = stage.toDataURL({ pixelRatio: 2 });
