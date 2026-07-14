@@ -9,6 +9,7 @@ import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH } from "../../constants";
 import { Sprite } from "../../Frames/reducers/frames";
 import Konva from "konva";
 import ArrowDropDown from "@mui/icons-material/ArrowDropDown";
+import { jsPDF } from "jspdf";
 import { addSpritesToLayer, renderFrameToDataUrl } from "../../helpers";
 
 // Frames are rendered, presigned, and uploaded one chunk at a time. This caps
@@ -406,6 +407,24 @@ export default function ExportVideo({
     }
   };
 
+  const handleExportFramePdf = async () => {
+    setIsExporting(true);
+    setAnchorEl(null);
+    try {
+      const dataUrl = await renderFrameToDataUrl(currentFrame.sprites);
+      const pdf = new jsPDF({
+        orientation:
+          VIEWPORT_WIDTH >= VIEWPORT_HEIGHT ? "landscape" : "portrait",
+        unit: "px",
+        format: [VIEWPORT_WIDTH, VIEWPORT_HEIGHT],
+      });
+      pdf.addImage(dataUrl, "PNG", 0, 0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
+      pdf.save("frame.pdf");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <>
       <Button
@@ -436,6 +455,9 @@ export default function ExportVideo({
           Export Video
         </MenuItem>
         <MenuItem onClick={handleExportFrame}>Export Frame as Image</MenuItem>
+        <MenuItem onClick={handleExportFramePdf} disabled={isExporting}>
+          Export Frame as PDF
+        </MenuItem>
       </Menu>
       <ExportProgressDialog progress={progress} />
     </>
