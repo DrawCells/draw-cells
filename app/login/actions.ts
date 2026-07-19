@@ -1,11 +1,7 @@
 "use server";
 
-import { cookies } from "next/headers";
-import { auth } from "../../lib/firebaseAdmin";
+import { createSupabaseServerClient } from "../../lib/supabaseServer";
 import { getSessionUser } from "../../lib/auth";
-
-const FIREBASE_API_KEY = "AIzaSyAr0dcOhdhNjwVe0_wyCQ4xNRDNbxKDV-E";
-const SESSION_EXPIRY = 5 * 24 * 60 * 60 * 1000; // 5 days
 
 interface AuthResult {
   success: boolean;
@@ -13,44 +9,9 @@ interface AuthResult {
   user?: { uid: string; email: string | null; displayName: string | null };
 }
 
-async function signInWithFirebaseRest(email: string, password: string) {
-  const res = await fetch(
-    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, returnSecureToken: true }),
-    }
-  );
-
-  if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.error?.message || "Authentication failed");
-  }
-
-  return res.json();
-}
-
-async function createSessionCookie(idToken: string) {
-  const sessionCookie = await auth.createSessionCookie(idToken, {
-    expiresIn: SESSION_EXPIRY,
-  });
-
-  const cookieStore = await cookies();
-  cookieStore.set("session", sessionCookie, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: SESSION_EXPIRY / 1000,
-  });
-
-  return sessionCookie;
-}
-
 export async function signupAction(
   _prevState: AuthResult,
-  formData: FormData
+  formData: FormData,
 ): Promise<AuthResult> {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
@@ -61,36 +22,43 @@ export async function signupAction(
     return { success: false, error: "All fields are required" };
   }
 
-  try {
-    const displayName = `${firstName} ${lastName}`;
-    await auth.createUser({ email, password, displayName });
+  const supabase = await createSupabaseServerClient();
+  // Email confirmation is disabled, so a successful signUp returns a session and
+  // the auth cookies are set on this response. The profiles row is created by the
+  // on_auth_user_created trigger, which reads these metadata fields.
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { data: { first_name: firstName, last_name: lastName } },
+  });
 
-    const signInResult = await signInWithFirebaseRest(email, password);
-    await createSessionCookie(signInResult.idToken);
-
-    return {
-      success: true,
-      user: {
-        uid: signInResult.localId,
-        email,
-        displayName,
-      },
-    };
-  } catch (e: any) {
-    const message = e.message || "Signup failed";
-    if (message.includes("EMAIL_EXISTS")) {
-      return { success: false, error: "An account with this email already exists" };
+  if (error) {
+    const message = error.message || "Signup failed";
+    if (/already registered|already exists/i.test(message)) {
+      return {
+        success: false,
+        error: "An account with this email already exists",
+      };
     }
-    if (message.includes("WEAK_PASSWORD")) {
+    if (/password/i.test(message)) {
       return { success: false, error: "Password should be at least 6 characters" };
     }
     return { success: false, error: message };
   }
+
+  return {
+    success: true,
+    user: {
+      uid: data.user?.id ?? "",
+      email,
+      displayName: `${firstName} ${lastName}`,
+    },
+  };
 }
 
 export async function loginAction(
   _prevState: AuthResult,
-  formData: FormData
+  formData: FormData,
 ): Promise<AuthResult> {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
@@ -99,54 +67,41 @@ export async function loginAction(
     return { success: false, error: "Email and password are required" };
   }
 
-  try {
-    const signInResult = await signInWithFirebaseRest(email, password);
-    await createSessionCookie(signInResult.idToken);
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
 
-    return {
-      success: true,
-      user: {
-        uid: signInResult.localId,
-        email: signInResult.email,
-        displayName: signInResult.displayName || null,
-      },
-    };
-  } catch (e: any) {
-    const message = e.message || "Login failed";
-    if (message.includes("INVALID_LOGIN_CREDENTIALS")) {
+  if (error) {
+    const message = error.message || "Login failed";
+    if (/invalid login credentials/i.test(message)) {
       return { success: false, error: "Invalid email or password" };
     }
-    if (message.includes("USER_DISABLED")) {
-      return { success: false, error: "This account has been disabled" };
+    if (/email not confirmed/i.test(message)) {
+      return { success: false, error: "Please confirm your email first" };
     }
     return { success: false, error: message };
   }
+
+  return {
+    success: true,
+    user: {
+      uid: data.user.id,
+      email: data.user.email ?? null,
+      displayName:
+        (data.user.user_metadata?.first_name &&
+          data.user.user_metadata?.last_name &&
+          `${data.user.user_metadata.first_name} ${data.user.user_metadata.last_name}`) ||
+        null,
+    },
+  };
 }
 
 export async function logoutAction(): Promise<{ success: boolean }> {
-  const cookieStore = await cookies();
-  cookieStore.delete("session");
+  const supabase = await createSupabaseServerClient();
+  await supabase.auth.signOut();
   return { success: true };
-}
-
-export async function googleLoginAction(
-  idToken: string
-): Promise<AuthResult> {
-  try {
-    const decodedToken = await auth.verifyIdToken(idToken);
-    await createSessionCookie(idToken);
-
-    return {
-      success: true,
-      user: {
-        uid: decodedToken.uid,
-        email: decodedToken.email || null,
-        displayName: decodedToken.name || null,
-      },
-    };
-  } catch (e: any) {
-    return { success: false, error: e.message || "Google sign-in failed" };
-  }
 }
 
 export async function getSession() {

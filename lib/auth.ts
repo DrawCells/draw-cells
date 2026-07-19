@@ -1,21 +1,23 @@
-import { cookies } from "next/headers";
-import { auth } from "./firebaseAdmin";
+import { createSupabaseServerClient } from "./supabaseServer";
 
 export async function getSessionUser() {
-  const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get("session")?.value;
-  if (!sessionCookie) return null;
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
 
-  try {
-    const decoded = await auth.verifySessionCookie(sessionCookie, true);
-    return {
-      uid: decoded.uid,
-      email: decoded.email || null,
-      displayName: decoded.name || null,
-    };
-  } catch {
-    return null;
-  }
+  const meta = user.user_metadata ?? {};
+  const displayName =
+    meta.first_name && meta.last_name
+      ? `${meta.first_name} ${meta.last_name}`
+      : meta.full_name || meta.name || null;
+
+  return {
+    uid: user.id,
+    email: user.email ?? null,
+    displayName,
+  };
 }
 
 // Comma-separated allowlist of admin emails, e.g. "a@x.com, b@y.com".

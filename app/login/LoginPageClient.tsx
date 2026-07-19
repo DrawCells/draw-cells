@@ -13,36 +13,24 @@ import {
 } from "@mui/material";
 import React, { useActionState, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signInWithPopup } from "firebase/auth";
-import {
-  auth as firebaseAuth,
-  googleProvider,
-} from "../../src/firebase-config";
-import { googleLoginAction, loginAction, signupAction } from "./actions";
+import { createSupabaseBrowserClient } from "../../lib/supabaseBrowser";
+import { loginAction, signupAction } from "./actions";
 
 function GoogleSignInButton() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
-  console.log("GoogleSignInButton rendered with error:", error);
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setError(null);
-    try {
-      const result = await signInWithPopup(firebaseAuth, googleProvider);
-      const idToken = await result.user.getIdToken();
-      const res = await googleLoginAction(idToken);
-      if (res.success) {
-        router.push("/");
-      } else {
-        setError(res.error || "Google sign-in failed");
-      }
-    } catch (e: any) {
-      if (e.code !== "auth/popup-closed-by-user") {
-        setError(e.message || "Google sign-in failed");
-      }
-    } finally {
+    const supabase = createSupabaseBrowserClient();
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
+    });
+    // On success the browser redirects to Google; we only reach here on error.
+    if (error) {
+      setError(error.message || "Google sign-in failed");
       setLoading(false);
     }
   };
