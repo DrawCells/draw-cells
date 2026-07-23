@@ -1,11 +1,15 @@
 "use server";
 
+import { headers } from "next/headers";
 import { createSupabaseServerClient } from "../../lib/supabaseServer";
 import { getSessionUser } from "../../lib/auth";
 
 interface AuthResult {
   success: boolean;
   error?: string;
+  // True when the failure is "invalid credentials" — the login form uses it to
+  // offer a password reset, since migrated users have no password set yet.
+  canReset?: boolean;
   user?: { uid: string; email: string | null; displayName: string | null };
 }
 
@@ -76,7 +80,11 @@ export async function loginAction(
   if (error) {
     const message = error.message || "Login failed";
     if (/invalid login credentials/i.test(message)) {
-      return { success: false, error: "Invalid email or password" };
+      return {
+        success: false,
+        error: "Invalid email or password",
+        canReset: true,
+      };
     }
     if (/email not confirmed/i.test(message)) {
       return { success: false, error: "Please confirm your email first" };
@@ -101,6 +109,30 @@ export async function loginAction(
 export async function logoutAction(): Promise<{ success: boolean }> {
   const supabase = await createSupabaseServerClient();
   await supabase.auth.signOut();
+  return { success: true };
+}
+
+export async function resetPasswordAction(
+  email: string,
+): Promise<{ success: boolean; error?: string }> {
+  if (!email) {
+    return { success: false, error: "Enter your email address first" };
+  }
+
+  const h = await headers();
+  const origin = h.get("origin") || `https://${h.get("host")}`;
+
+  const supabase = await createSupabaseServerClient();
+  // Sends a one-time reset link. The link routes through /auth/callback (which
+  // exchanges the code for a recovery session) and on to /auth/reset, where the
+  // user sets a new password. This is the only email the app sends.
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${origin}/auth/callback?next=/auth/reset`,
+  });
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
   return { success: true };
 }
 

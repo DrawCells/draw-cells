@@ -37,6 +37,11 @@ create policy "profiles: read own" on profiles
 create policy "profiles: update own" on profiles
   for update using (auth.uid() = id) with check (auth.uid() = id);
 
+-- Maps each migrated Supabase user back to its old Firebase uid. Set by the user
+-- migration script; Phase 5 joins on it to remap presentations.user_id. Can be
+-- dropped once the migration is fully verified.
+alter table profiles add column if not exists firebase_uid text unique;
+
 -- Create a profile row whenever a new auth user signs up. Reads first/last name
 -- from the signup metadata (user_metadata.first_name / last_name).
 create or replace function handle_new_user() returns trigger as $$
@@ -120,6 +125,10 @@ create table if not exists presentations (
   updated_at    timestamptz not null default now()
 );
 create index if not exists presentations_user_id_idx on presentations (user_id);
+
+-- Traceability + idempotency for the RTDB migration: the old Firebase push key.
+-- Null for presentations created after the migration. Can be dropped in Phase 6.
+alter table presentations add column if not exists firebase_id text unique;
 
 create trigger presentations_set_updated_at
   before update on presentations

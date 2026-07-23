@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "../../../../lib/firebaseAdmin";
+import { supabaseAdmin } from "../../../../lib/supabaseAdmin";
 
 // Called by Lambda when the export is complete
 export async function POST(req: NextRequest) {
@@ -11,9 +11,13 @@ export async function POST(req: NextRequest) {
     }
 
     if (error) {
-      await db.ref(`exportJobs/${jobId}`).set({ status: "failed", error });
+      await supabaseAdmin
+        .from("export_jobs")
+        .upsert({ id: jobId, status: "failed", error });
     } else {
-      await db.ref(`exportJobs/${jobId}`).set({ status: "completed", videoUrl });
+      await supabaseAdmin
+        .from("export_jobs")
+        .upsert({ id: jobId, status: "completed", video_url: videoUrl });
     }
 
     return NextResponse.json({ ok: true });

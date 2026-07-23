@@ -52,7 +52,9 @@
     "generate:sprite-map": "tsx scripts/generateSpriteMap.ts",
     "migrate:signed-urls": "tsx scripts/migrateSignedUrlsToStoragePaths.ts",
     "migrate:storage-to-s3": "tsx scripts/migrateStorageToS3.ts",
-    "migrate:sprites-to-supabase": "tsx scripts/migrateSpritesToSupabase.ts"
+    "migrate:sprites-to-supabase": "tsx scripts/migrateSpritesToSupabase.ts",
+    "migrate:users-to-supabase": "tsx scripts/migrateUsersToSupabase.ts",
+    "migrate:presentations-to-supabase": "tsx scripts/migratePresentationsToSupabase.ts"
   },
   "eslintConfig": {
     "extends": [
