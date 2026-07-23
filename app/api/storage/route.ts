@@ -1,7 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminApp } from "../../../lib/firebaseAdmin";
+import {
+  GetObjectCommand,
+  ListObjectsV2Command,
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { s3, S3_BUCKET } from "../../../lib/s3";
 
-const bucket = adminApp.storage().bucket();
+const SIGNED_URL_TTL = 60 * 60; // 1 hour, in seconds
+
+function signRead(key: string) {
+  return getSignedUrl(
+    s3,
+    new GetObjectCommand({ Bucket: S3_BUCKET, Key: key }),
+    { expiresIn: SIGNED_URL_TTL },
+  );
+}
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -13,10 +26,7 @@ export async function GET(req: NextRequest) {
   // Single file URL
   if (path) {
     try {
-      const [url] = await bucket.file(path).getSignedUrl({
-        action: "read",
-        expires: Date.now() + 60 * 60 * 1000, // 1 hour
-      });
+      const url = await signRead(path);
       return NextResponse.json({ url });
     } catch (error) {
       console.error("Failed to get signed URL for", path, error);
@@ -27,23 +37,23 @@ export async function GET(req: NextRequest) {
   // List files in a prefix (for backgrounds)
   if (prefix) {
     try {
-      const [files, , apiResponse] = await bucket.getFiles({
-        prefix,
-        maxResults,
-        pageToken,
-        autoPaginate: false,
-      });
+      const listed = await s3.send(
+        new ListObjectsV2Command({
+          Bucket: S3_BUCKET,
+          Prefix: prefix,
+          MaxKeys: maxResults,
+          ContinuationToken: pageToken,
+        }),
+      );
 
-      const files2 = await Promise.all(
-        files
-          .filter((file) => !file.name.endsWith("/"))
-          .map(async (file) => {
+      const files = await Promise.all(
+        (listed.Contents ?? [])
+          .map((obj) => obj.Key)
+          .filter((key): key is string => !!key && !key.endsWith("/"))
+          .map(async (key) => {
             try {
-              const [url] = await file.getSignedUrl({
-                action: "read",
-                expires: Date.now() + 60 * 60 * 1000,
-              });
-              return { path: file.name, url };
+              const url = await signRead(key);
+              return { path: key, url };
             } catch {
               return null;
             }
@@ -51,8 +61,8 @@ export async function GET(req: NextRequest) {
       );
 
       return NextResponse.json({
-        files: files2.filter(Boolean),
-        nextPageToken: (apiResponse as any)?.nextPageToken || null,
+        files: files.filter(Boolean),
+        nextPageToken: listed.NextContinuationToken || null,
       });
     } catch (error) {
       console.error("Failed to list files", error);
@@ -80,10 +90,7 @@ export async function POST(req: NextRequest) {
   const urls = await Promise.all(
     paths.map(async (path: string) => {
       try {
-        const [url] = await bucket.file(path).getSignedUrl({
-          action: "read",
-          expires: Date.now() + 60 * 60 * 1000,
-        });
+        const url = await signRead(path);
         return { path, url };
       } catch {
         return { path, url: "" };
