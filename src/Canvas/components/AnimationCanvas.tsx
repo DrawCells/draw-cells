@@ -1,7 +1,6 @@
 "use client";
 
 import { CircularProgress, useTheme } from "@mui/material";
-import { get, ref } from "firebase/database";
 import React, { useEffect, useRef, useState } from "react";
 import { DndProvider, useDrop, XYCoord } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -13,7 +12,6 @@ import {
   VIEWPORT_HEIGHT,
   VIEWPORT_WIDTH,
 } from "../../constants";
-import { db } from "../../firebase-config";
 import {
   addCurrentSprite,
   addSprite,
@@ -118,8 +116,9 @@ function AnimationCanvas() {
     hasLoadedRef.current = false;
     setIsLoading(true);
     const getData = async () => {
-      const res = await get(ref(db, `presentations/${presentationId}`));
-      dispatch(loadInitialData(res.val()));
+      const res = await fetch(`/api/presentations/${presentationId}`);
+      const data = await res.json();
+      dispatch(loadInitialData(data));
       hasLoadedRef.current = true;
       setIsLoading(false);
 

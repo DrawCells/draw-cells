@@ -18,8 +18,6 @@ import {
 } from "../../Frames/reducers/frames";
 import AnimationSprite from "../../Sprites/AnimationSprite";
 import State from "../../stateInterface";
-import { get, ref } from "firebase/database";
-import { db } from "../../../src/firebase-config";
 
 const SCALE = Math.min(
   (window.innerWidth - 250) / VIEWPORT_WIDTH,
@@ -47,10 +45,9 @@ const PresentationContainer = ({
       return;
     }
 
-    get(ref(db, `presentations/${presentationId}`)).then((res) => {
-      console.log("Pres container", res.val());
-      dispatch(loadInitialData(res.val()));
-    });
+    fetch(`/api/presentations/${presentationId}`)
+      .then((res) => res.json())
+      .then((data) => dispatch(loadInitialData(data)));
   }, [presentationId]);
 
   return (

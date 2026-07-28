@@ -13,36 +13,24 @@ import {
 } from "@mui/material";
 import React, { useActionState, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signInWithPopup } from "firebase/auth";
-import {
-  auth as firebaseAuth,
-  googleProvider,
-} from "../../src/firebase-config";
-import { googleLoginAction, loginAction, signupAction } from "./actions";
+import { createSupabaseBrowserClient } from "../../lib/supabaseBrowser";
+import { loginAction, resetPasswordAction, signupAction } from "./actions";
 
 function GoogleSignInButton() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
-  console.log("GoogleSignInButton rendered with error:", error);
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setError(null);
-    try {
-      const result = await signInWithPopup(firebaseAuth, googleProvider);
-      const idToken = await result.user.getIdToken();
-      const res = await googleLoginAction(idToken);
-      if (res.success) {
-        router.push("/");
-      } else {
-        setError(res.error || "Google sign-in failed");
-      }
-    } catch (e: any) {
-      if (e.code !== "auth/popup-closed-by-user") {
-        setError(e.message || "Google sign-in failed");
-      }
-    } finally {
+    const supabase = createSupabaseBrowserClient();
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
+    });
+    // On success the browser redirects to Google; we only reach here on error.
+    if (error) {
+      setError(error.message || "Google sign-in failed");
       setLoading(false);
     }
   };
@@ -55,6 +43,7 @@ function GoogleSignInButton() {
         </Typography>
       )}
       <Button
+        type="button"
         variant="outlined"
         fullWidth
         onClick={handleGoogleSignIn}
@@ -71,6 +60,9 @@ function LoginForm({ toggleForm }: { toggleForm: (mode: string) => void }) {
   const [state, formAction, isPending] = useActionState(loginAction, {
     success: false,
   });
+  const [email, setEmail] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetMsg, setResetMsg] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -78,6 +70,18 @@ function LoginForm({ toggleForm }: { toggleForm: (mode: string) => void }) {
       router.push("/");
     }
   }, [state.success, router]);
+
+  const handleReset = async () => {
+    setResetLoading(true);
+    setResetMsg(null);
+    const res = await resetPasswordAction(email);
+    setResetLoading(false);
+    setResetMsg(
+      res.success
+        ? "If an account exists for that email, a reset link is on its way. Check your inbox."
+        : res.error || "Could not send the reset link. Please try again.",
+    );
+  };
 
   return (
     <form action={formAction}>
@@ -98,8 +102,32 @@ function LoginForm({ toggleForm }: { toggleForm: (mode: string) => void }) {
           account.
         </Typography>
         {state.error && (
-          <Typography color="error" fontSize={14} sx={{ mb: 2 }}>
+          <Typography color="error" fontSize={14} sx={{ mb: 1 }}>
             {state.error}
+          </Typography>
+        )}
+        {state.canReset && !resetMsg && (
+          <Box sx={{ mb: 2 }}>
+            <Typography fontSize={13} color="text.secondary" sx={{ mb: 1 }}>
+              Returning user? Your account needs a new password.
+            </Typography>
+            <Button
+              type="button"
+              size="small"
+              onClick={handleReset}
+              disabled={resetLoading || !email}
+            >
+              {resetLoading ? (
+                <CircularProgress size={16} />
+              ) : (
+                "Send password reset link"
+              )}
+            </Button>
+          </Box>
+        )}
+        {resetMsg && (
+          <Typography fontSize={13} color="text.secondary" sx={{ mb: 2 }}>
+            {resetMsg}
           </Typography>
         )}
         <TextField
@@ -110,6 +138,8 @@ function LoginForm({ toggleForm }: { toggleForm: (mode: string) => void }) {
           fullWidth
           variant="standard"
           required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
           sx={{ mb: 2 }}
         />
         <TextField

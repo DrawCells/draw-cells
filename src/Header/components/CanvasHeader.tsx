@@ -15,11 +15,10 @@ import {
   Typography,
   useTheme,
 } from "@mui/material";
-import { ref, update } from "firebase/database";
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useParams, useRouter } from "next/navigation";
-import { db } from "../../firebase-config";
+import { renamePresentation } from "../actions";
 import { updatePresentationTitle, undo, redo } from "../../Frames/actions";
 import { toggleModal } from "../../Presentation/actions";
 import State from "../../stateInterface";
@@ -38,7 +37,6 @@ const CanvasHeader = () => {
   );
   const [isTitleEditing, setIsTitleEditing] = useState(false);
   const [currentTitle, setCurrentTitle] = useState(presentationTitle);
-  const user = useSelector((state: State) => state.home.user);
   const { id: presentationId } = useParams<{ id: string }>();
   const canUndo = useSelector((state: State) => state.frames._past.length > 0);
   const canRedo = useSelector((state: State) => state.frames._future.length > 0);
@@ -65,10 +63,7 @@ const CanvasHeader = () => {
   }, [dispatch]);
 
   const handleSave = async () => {
-    await update(ref(db), {
-      [`presentations/${presentationId}/title`]: currentTitle,
-      [`/user-presentations/${user.uid}/${presentationId}/title`]: currentTitle,
-    });
+    await renamePresentation(presentationId, currentTitle);
     dispatch(updatePresentationTitle(currentTitle));
     setIsTitleEditing(false);
   };
