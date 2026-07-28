@@ -1,8 +1,17 @@
 # Firebase Auth + RTDB → Supabase Migration Plan
 
-> **Status:** Not started · **Last updated:** 2026-07-16
+> **Status:** Phases 0–4 complete · Phase 5 in progress · **Last updated:** 2026-07-28
 >
 > Living document — update statuses and check items off as we progress.
+>
+> **Where things stand:** the application no longer touches Firebase at all —
+> `firebase` (client SDK) is uninstalled and `src/firebase-config.js` is gone.
+> `firebase-admin` survives as a **devDependency** purely so the one-shot
+> migration scripts in `scripts/` can still read the old RTDB/Auth data; it is
+> not reachable from app code. **The production data cutover has not run yet.**
+> Once it has and the results are verified, delete `scripts/firebaseAdmin.ts`
+> plus the `migrate*` scripts, drop the `firebase-admin` devDependency, remove
+> the `FIREBASE_*` env vars, and decommission the GCP service account.
 
 ## Context
 
@@ -27,12 +36,26 @@ Auth and RTDB are **coupled**: the Firebase `uid` is the foreign key tying prese
 
 ## Open decisions
 
-- [ ] **Client data-access pattern.** Keep all data behind Next API routes/server actions, or let the browser use `supabase-js` directly with RLS.
-  - **Recommendation:** hybrid — `supabase-js` on the client for RLS-safe reads (own presentations, sprite search); service-role on the server for privileged writes (export-job callback, admin).
-  - **Chosen:** _TBD_
-- [ ] **Password migration.** Import Firebase scrypt hashes (seamless) vs. force a password-reset email (simpler/more reliable, user friction).
-  - **Recommendation:** import hashes; reset-email as fallback if import proves unreliable.
-  - **Chosen:** _TBD_
+- [x] **Client data-access pattern.**
+  - **Chosen:** everything behind Next API routes (`app/api/*`). User-scoped work
+    goes through the `@supabase/ssr` server client so RLS is enforced; privileged
+    work (sprite catalog, export-job callback, admin user list) uses the
+    secret-key client in `lib/supabaseAdmin.ts`, which bypasses RLS.
+- [x] **Password migration.**
+  - **Chosen:** reset, not hash import. `migrateUsersToSupabase.ts` creates each
+    user with **no password** and `email_confirm: true` — the email is marked
+    verified without sending anything, but password login fails until the user
+    resets. Google users link to the imported row by verified email on first
+    sign-in.
+  - ⚠️ **Consequence:** every existing email/password user must reset their
+    password at cutover. Plan the comms.
+- [x] **UID preservation.**
+  - **Chosen:** *not* preserved. Supabase mints fresh uuids and
+    `profiles.firebase_uid` maps back to the old Firebase uid;
+    `migratePresentationsToSupabase.ts` joins through it to resolve
+    `presentations.user_id`. This removes the original "uid preservation is
+    load-bearing" risk, and replaces it with a dependency on the mapping column
+    being correctly populated *before* the presentations migration runs.
 
 ## Schema
 
@@ -112,15 +135,27 @@ create table export_jobs (
 - [ ] **Sprites** — `SpritesSection`: replace RTDB pagination + fetch-all-and-filter search with a Supabase query (`ilike`/tag match + range pagination). Deletes real complexity.
 - [ ] **Export jobs** — three routes → `export_jobs` insert/update/select.
 
-### Phase 5 — Cutover + cleanup
+### Phase 5 — Dependency removal (done)
+- [x] Remove the `firebase` client SDK; delete `src/firebase-config.js` (it had no importers left).
+- [x] `app/admin/page.tsx` → `supabaseAdmin.auth.admin.listUsers()`, paged at 1000/page. Shape-mapped to the existing `AdminUser` interface so `UsersList` is untouched: `banned_until` → `disabled`, `email_confirmed_at` → `emailVerified`, `app_metadata.providers` (falling back to `identities`) → `providerIds`.
+- [x] Move `lib/firebaseAdmin.ts` → `scripts/firebaseAdmin.ts` and demote `firebase-admin` to a devDependency, so Firebase is structurally unreachable from app code.
+- [x] Confirm S3 asset work is unaffected — `/api/storage` is pure S3; `sprites.base_image_url` still resolves.
+- [x] Confirm no new Vercel-only dependencies were introduced (keeps the door open for the containerization plan).
+
+### Phase 6 — Cutover + final teardown (pending)
 - [ ] Coordinated cutover (small app → short maintenance window; avoids dual-write).
-- [ ] Remove `firebase` / `firebase-admin`; delete `firebase-config.js`, `firebaseAdmin.ts`; remove Firebase env.
-- [ ] Confirm S3 asset work is unaffected (`sprites.base_image_url` still resolves via `/api/storage`).
-- [ ] Confirm no new Vercel-only dependencies were introduced (keeps the door open for the containerization plan).
+- [ ] Run the migration scripts against production, in order: `migrate:users-to-supabase` → `migrate:presentations-to-supabase` (presentations depend on `profiles.firebase_uid` being populated first). Both support `--dry-run`.
+- [ ] Notify email/password users that they must reset their password.
+- [ ] Verify row counts and spot-check presentations before tearing anything down.
+- [ ] Delete `scripts/firebaseAdmin.ts` + the `migrate*` scripts and their `package.json` entries; drop the `firebase-admin` devDependency.
+- [ ] Remove `FIREBASE_SERVICE_ACCOUNT_KEY` / `FIREBASE_DATABASE_URL` from `.env`, `.env.local`, and the Vercel project.
+- [ ] Delete the local `drawcells-service-account.json` and revoke the `firebase-adminsdk-68w68@drawcells` service account in GCP.
+- [ ] Optionally drop the `profiles.firebase_uid` / `presentations.firebase_id` mapping columns once tracing is no longer needed.
 
 ## Risks
 
-- **UID preservation is load-bearing.** If Supabase user ids ≠ old Firebase uids, every presentation orphans. The import script must guarantee this (or use the `firebase_uid` map column).
-- **Google account linking** depends on verified-email matching — test before the full import.
+- **Script ordering is load-bearing.** `migratePresentationsToSupabase` resolves owners through `profiles.firebase_uid`, so the user migration must complete first. Run it out of order and presentations silently fail to map. Dry-run both.
+- **Google account linking** depends on verified-email matching — test with one account before the full import.
 - **Auth + data cut over together** — can't half-migrate, since uid is the FK.
-- **Password hash import** is the least certain step; keep the reset-email fallback ready.
+- **All password users must reset.** No hashes are imported (see Open decisions), so this is a known, deliberate cost that needs user comms rather than a technical fix.
+- **Users with no email are skipped** by the import script. Any such Firebase accounts, and the presentations attached to them, will not come across.

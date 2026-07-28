@@ -48,7 +48,7 @@ async function run() {
   const dryRun = process.argv.includes("--dry-run");
   const skipExisting = process.argv.includes("--skip-existing");
 
-  const { adminApp } = await import("../lib/firebaseAdmin");
+  const { adminApp } = await import("./firebaseAdmin");
   const { s3, S3_BUCKET } = await import("../lib/s3");
   const bucket = adminApp.storage().bucket();
 

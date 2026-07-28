@@ -12,7 +12,7 @@ function splitName(displayName?: string | null) {
 }
 
 async function run() {
-  const { auth: firebaseAuth } = await import("../lib/firebaseAdmin");
+  const { auth: firebaseAuth } = await import("./firebaseAdmin");
   const { supabaseAdmin } = await import("../lib/supabaseAdmin");
 
   const dryRun = process.argv.includes("--dry-run");

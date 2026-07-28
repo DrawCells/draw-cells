@@ -11,7 +11,7 @@ function toArray(value: any): any[] {
 }
 
 async function run() {
-  const { db } = await import("../lib/firebaseAdmin");
+  const { db } = await import("./firebaseAdmin");
   const { supabaseAdmin } = await import("../lib/supabaseAdmin");
 
   const dryRun = process.argv.includes("--dry-run");

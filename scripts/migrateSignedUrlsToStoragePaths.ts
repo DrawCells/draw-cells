@@ -18,7 +18,7 @@ function extractStoragePath(url: string): string | null {
 }
 
 async function run() {
-  const { db } = await import("../lib/firebaseAdmin");
+  const { db } = await import("./firebaseAdmin");
 
   const snapshot = await db.ref("presentations").once("value");
   const presentations = snapshot.val() as Record<string, any> | null;
