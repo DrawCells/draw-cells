@@ -1,12 +1,12 @@
 import React from "react";
 import {
-  removeCurrentSprites,
-  removeCurrentSpritesFromAllFrames,
-  copySelectedSpriteSIntoFrame,
-  sendSpriteToBack,
-  bringSpriteToFront,
-  groupSprites,
-  ungroupSprites,
+  removeSpritesByIds,
+  removeSpritesByIdsFromAllFrames,
+  copySpritesIntoFrame,
+  sendSpritesToBack,
+  bringSpritesToFront,
+  groupSpritesByIds,
+  ungroupSpritesByIds,
 } from "../../Frames/actions";
 import { Menu, MenuItem } from "@mui/material";
 import { useDispatch, useSelector } from "react-redux";
@@ -26,6 +26,9 @@ export default function ContextMenu({ menuState, setMenuState }: any) {
   const currentSprites = useSelector((state: State) => state.frames.currentSprites);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
 
+  // Sprite mutations are id-addressed, so the menu passes the selection in
+  // explicitly rather than the reducer reaching into it.
+  const selectedIds = currentSprites.map((s) => s.id);
   const canGroup = currentSprites.length >= 2;
   const canUngroup = currentSprites.some((s) => !!s.groupId);
 
@@ -42,10 +45,12 @@ export default function ContextMenu({ menuState, setMenuState }: any) {
             : undefined
         }
       >
-        <MenuItem onClick={() => dispatch(removeCurrentSprites())}>
+        <MenuItem onClick={() => dispatch(removeSpritesByIds(selectedIds))}>
           Remove from crt. frame
         </MenuItem>
-        <MenuItem onClick={() => dispatch(removeCurrentSpritesFromAllFrames())}>
+        <MenuItem
+          onClick={() => dispatch(removeSpritesByIdsFromAllFrames(selectedIds))}
+        >
           Remove from all frames
         </MenuItem>
         <MenuItem
@@ -54,21 +59,21 @@ export default function ContextMenu({ menuState, setMenuState }: any) {
         >
           Copy to frame
         </MenuItem>
-        <MenuItem onClick={() => dispatch(sendSpriteToBack())}>
+        <MenuItem onClick={() => dispatch(sendSpritesToBack(selectedIds))}>
           Send to Back
         </MenuItem>
-        <MenuItem onClick={() => dispatch(bringSpriteToFront())}>
+        <MenuItem onClick={() => dispatch(bringSpritesToFront(selectedIds))}>
           Bring to Front
         </MenuItem>
         <MenuItem
           disabled={!canGroup}
-          onClick={() => { dispatch(groupSprites()); handleClose(); }}
+          onClick={() => { dispatch(groupSpritesByIds(selectedIds)); handleClose(); }}
         >
           Group (⌘G)
         </MenuItem>
         <MenuItem
           disabled={!canUngroup}
-          onClick={() => { dispatch(ungroupSprites()); handleClose(); }}
+          onClick={() => { dispatch(ungroupSpritesByIds(selectedIds)); handleClose(); }}
         >
           Ungroup (⌘⇧G)
         </MenuItem>
@@ -77,7 +82,7 @@ export default function ContextMenu({ menuState, setMenuState }: any) {
         {framesList.map((f) => (
           <MenuItem
             key={`copy-selected-into-${f.id}`}
-            onClick={() => dispatch(copySelectedSpriteSIntoFrame(f.id || ""))}
+            onClick={() => dispatch(copySpritesIntoFrame(selectedIds, f.id || ""))}
           >
             Frame {f.id}
           </MenuItem>

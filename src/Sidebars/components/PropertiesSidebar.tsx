@@ -3,11 +3,23 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { Input, MenuItem, Select, Slider, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
 import React, { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { updateAllSelectedSprites } from '../../Frames/actions';
+import { updateSpritesByIds } from '../../Frames/actions';
 import { isArrowSprite, isTextSprite } from '../../Frames/reducers/frames';
 import State from '../../stateInterface';
 import { toggleProperties } from '../actions';
 import BaseSidebar from './BaseSidebar';
+
+// The sidebar displays the first selected sprite's values but applies edits to
+// every selected sprite. Sprite mutations are id-addressed, so this reads the
+// selection here and passes the ids down to the action. `currentSprites` is
+// selected (rather than a derived id array) so the reference stays stable and
+// useSelector doesn't re-render on every unrelated store change.
+function useUpdateSelectedSprites() {
+  const dispatch = useDispatch();
+  const currentSprites = useSelector((state: State) => state.frames.currentSprites);
+  return (fields: Record<string, any>) =>
+    dispatch(updateSpritesByIds({ ids: currentSprites.map((s) => s.id), fields }));
+}
 
 function ColorInput({
   value,
@@ -54,7 +66,7 @@ function SectionHeader({ title }: { title: string }) {
 }
 
 function TextProperties({ currentSprite }: any) {
-  const dispatch = useDispatch();
+  const updateSelected = useUpdateSelectedSprites();
 
   // Local state so the field stays responsive while typing; the store update
   // (which is undo-tracked) is debounced so a burst of typing is one undo entry.
@@ -74,7 +86,7 @@ function TextProperties({ currentSprite }: any) {
 
   const commit = (value: string) => {
     if (value !== (currentSprite?.text ?? '')) {
-      dispatch(updateAllSelectedSprites({ field: 'text', value }));
+      updateSelected({ text: value });
     }
   };
 
@@ -115,7 +127,7 @@ function TextProperties({ currentSprite }: any) {
           <Input
             type="number"
             value={currentSprite?.fontSize ?? ''}
-            onChange={(e) => dispatch(updateAllSelectedSprites({ field: 'fontSize', value: parseInt(e.target.value) || 0 }))}
+            onChange={(e) => updateSelected({ fontSize: parseInt(e.target.value) || 0 })}
           />
         </TableCell>
       </TableRow>
@@ -124,7 +136,7 @@ function TextProperties({ currentSprite }: any) {
         <TableCell>
           <ColorInput
             value={currentSprite?.fill || '#000000'}
-            onChange={(e) => dispatch(updateAllSelectedSprites({ field: 'fill', value: e.target.value }))}
+            onChange={(e) => updateSelected({ fill: e.target.value })}
           />
         </TableCell>
       </TableRow>
@@ -134,7 +146,7 @@ function TextProperties({ currentSprite }: any) {
           <Select
             size="small"
             value={currentSprite?.fontFamily || 'Arial'}
-            onChange={(e) => dispatch(updateAllSelectedSprites({ field: 'fontFamily', value: e.target.value }))}
+            onChange={(e) => updateSelected({ fontFamily: e.target.value })}
           >
             <MenuItem value="Arial">Arial</MenuItem>
             <MenuItem value="Times New Roman">Times New Roman</MenuItem>
@@ -150,7 +162,7 @@ function TextProperties({ currentSprite }: any) {
           <Select
             size="small"
             value={currentSprite?.align || 'left'}
-            onChange={(e) => dispatch(updateAllSelectedSprites({ field: 'align', value: e.target.value }))}
+            onChange={(e) => updateSelected({ align: e.target.value })}
           >
             <MenuItem value="left">Left</MenuItem>
             <MenuItem value="center">Center</MenuItem>
@@ -164,7 +176,7 @@ function TextProperties({ currentSprite }: any) {
           <Select
             size="small"
             value={currentSprite?.fontStyle || 'normal'}
-            onChange={(e) => dispatch(updateAllSelectedSprites({ field: 'fontStyle', value: e.target.value }))}
+            onChange={(e) => updateSelected({ fontStyle: e.target.value })}
           >
             <MenuItem value="normal">Normal</MenuItem>
             <MenuItem value="bold">Bold</MenuItem>
@@ -178,7 +190,7 @@ function TextProperties({ currentSprite }: any) {
 }
 
 function ArrowProperties({ currentSprite }: any) {
-  const dispatch = useDispatch();
+  const updateSelected = useUpdateSelectedSprites();
   return (
     <>
       <SectionHeader title="Arrow" />
@@ -187,7 +199,7 @@ function ArrowProperties({ currentSprite }: any) {
         <TableCell>
           <ColorInput
             value={currentSprite?.stroke || '#000000'}
-            onChange={(e) => dispatch(updateAllSelectedSprites({ field: 'stroke', value: e.target.value }))}
+            onChange={(e) => updateSelected({ stroke: e.target.value })}
           />
         </TableCell>
       </TableRow>
@@ -196,7 +208,7 @@ function ArrowProperties({ currentSprite }: any) {
 }
 
 function ChaoticAnimationProperties({currentSprite}: any) {
-  const dispatch = useDispatch()
+  const updateSelected = useUpdateSelectedSprites()
   const [rangeOfMovementSlider, setRangeOfMovementSlider] = useState(currentSprite.rangeOfMovement)
   const [nrOfIterationsSlider, setNrOfIterationsSlider] = useState(currentSprite.nrOfIterations)
 
@@ -213,7 +225,7 @@ function ChaoticAnimationProperties({currentSprite}: any) {
           <Input
             type="number"
             value={currentSprite?.minTravelDistance || ''}
-            onChange={(e) => dispatch(updateAllSelectedSprites({field: 'minTravelDistance', value: parseInt(e.target.value)}))}
+            onChange={(e) => updateSelected({ minTravelDistance: parseInt(e.target.value) })}
           />
         </TableCell>
       </TableRow> */}
@@ -223,7 +235,7 @@ function ChaoticAnimationProperties({currentSprite}: any) {
           {/* <Input
             type="number"
             value={currentSprite?.rangeOfMovement || ''}
-            onChange={(e) => dispatch(updateAllSelectedSprites({field: 'rangeOfMovement', value: parseInt(e.target.value)}))}
+            onChange={(e) => updateSelected({ rangeOfMovement: parseInt(e.target.value) })}
           /> */}
           <Slider
             step={10}
@@ -231,7 +243,7 @@ function ChaoticAnimationProperties({currentSprite}: any) {
             max={500}
             valueLabelDisplay="auto"
             onChange={(e, newValue) => setRangeOfMovementSlider(newValue)}
-            onChangeCommitted={(e, newValue) => dispatch(updateAllSelectedSprites({field: 'rangeOfMovement', value: newValue}))}
+            onChangeCommitted={(e, newValue) => updateSelected({ rangeOfMovement: newValue })}
             value={rangeOfMovementSlider}
           />
         </TableCell>
@@ -242,7 +254,7 @@ function ChaoticAnimationProperties({currentSprite}: any) {
           {/* <Input
             type="number"
             value={currentSprite?.nrOfIterations || ''}
-            onChange={(e) => dispatch(updateAllSelectedSprites({field: 'nrOfIterations', value: parseInt(e.target.value || '0')}))}
+            onChange={(e) => updateSelected({ nrOfIterations: parseInt(e.target.value || '0') })}
           /> */}
           <Slider
             step={1}
@@ -250,7 +262,7 @@ function ChaoticAnimationProperties({currentSprite}: any) {
             max={30}
             valueLabelDisplay="auto"
             onChange={(e, newValue) => setNrOfIterationsSlider(newValue)}
-            onChangeCommitted={(e, newValue) => dispatch(updateAllSelectedSprites({field: 'nrOfIterations', value: newValue}))}
+            onChangeCommitted={(e, newValue) => updateSelected({ nrOfIterations: newValue })}
             value={nrOfIterationsSlider}
           />
         </TableCell>
@@ -261,6 +273,7 @@ function ChaoticAnimationProperties({currentSprite}: any) {
 
 export default function PropertiesSidebar() {
   const dispatch = useDispatch()
+  const updateSelected = useUpdateSelectedSprites()
   const isPropertiesSidebarOpen = useSelector((state: State) => state.sidebars.isPropertiesOpen)
   const currentSprites = useSelector((state: State) => state.frames.currentSprites)
   const currentSprite = currentSprites.length <= 0 ? null : currentSprites[0]
@@ -291,7 +304,7 @@ export default function PropertiesSidebar() {
               <TableCell>
                 <Input
                   value={currentSprite?.id || ''}
-                  onChange={(e) => dispatch(updateAllSelectedSprites({field: 'id', value: e.target.value}))}
+                  onChange={(e) => updateSelected({ id: e.target.value })}
                 />
               </TableCell>
             </TableRow>
@@ -300,7 +313,7 @@ export default function PropertiesSidebar() {
               <TableCell>
                 <Input
                   value={currentSprite?.position.x || ''}
-                  onChange={(e) => dispatch(updateAllSelectedSprites({field: 'positionX', value: e.target.value}))}
+                  onChange={(e) => updateSelected({ positionX: e.target.value })}
                 />
               </TableCell>
             </TableRow>
@@ -309,7 +322,7 @@ export default function PropertiesSidebar() {
               <TableCell>
                 <Input
                   value={currentSprite?.position.y || ''}
-                  onChange={(e) => dispatch(updateAllSelectedSprites({field: 'positionY', value: e.target.value}))}
+                  onChange={(e) => updateSelected({ positionY: e.target.value })}
                 />
               </TableCell>
             </TableRow>
@@ -319,7 +332,7 @@ export default function PropertiesSidebar() {
                 <Input
                   type="number"
                   value={currentSprite?.zIndex || ''}
-                  onChange={(e) => dispatch(updateAllSelectedSprites({field: 'zIndex', value: e.target.value}))}
+                  onChange={(e) => updateSelected({ zIndex: e.target.value })}
                 />
               </TableCell>
             </TableRow>
@@ -340,7 +353,7 @@ export default function PropertiesSidebar() {
                 <Input
                   type="number"
                   value={currentSprite?.duration || ''}
-                  onChange={(e) => dispatch(updateAllSelectedSprites({field: 'duration', value: parseInt(e.target.value)}))}
+                  onChange={(e) => updateSelected({ duration: parseInt(e.target.value) })}
                 />
               </TableCell>
             </TableRow>
@@ -349,7 +362,7 @@ export default function PropertiesSidebar() {
               <TableCell>
                 <Select
                   value={currentSprite?.animationType || ''}
-                  onChange={(e) => dispatch(updateAllSelectedSprites({field: 'animationType', value: e.target.value}))}
+                  onChange={(e) => updateSelected({ animationType: e.target.value })}
                   size="small"
                 >
                   <MenuItem value="LINEAR">Linear</MenuItem>
@@ -366,7 +379,7 @@ export default function PropertiesSidebar() {
               <TableCell>
                 <Select
                   value={currentSprite?.circleDirection || 1}
-                  onChange={(e) => dispatch(updateAllSelectedSprites({field: 'circleDirection', value: e.target.value}))}
+                  onChange={(e) => updateSelected({ circleDirection: e.target.value })}
                   size="small"
                 >
                   <MenuItem value={1}>Upwards</MenuItem>
@@ -380,7 +393,7 @@ export default function PropertiesSidebar() {
                 <Input
                   type="number"
                   value={currentSprite?.angle || ''}
-                  onChange={(e) => dispatch(updateAllSelectedSprites({field: 'angle', value: e.target.value}))}
+                  onChange={(e) => updateSelected({ angle: e.target.value })}
                 />
               </TableCell>
             </TableRow>)}
