@@ -4,6 +4,23 @@ export const rightDrawerWidth = 300;
 export const bottomDrawerHeight = 240;
 export const leftDrawerWidth = 300;
 
+// The editor sits in a rounded card floating on the page, with this much
+// breathing room around it.
+export const editorPagePadding = 16;
+// A light tint of the primary green — rgb(21, 62, 49) is hsl(161, 49%, 16%),
+// so this holds the hue and trades saturation for lightness: hsl(161, 32%, 91%).
+export const editorPageBg = "#e1efeb";
+// Soft and green-tinted rather than plain black, so the white cards lift off the
+// tinted page without the shadow reading as grey smudge.
+export const editorCardShadow = "0 8px 28px rgba(21, 62, 49, 0.14)";
+
+// AI chat column, docked to the right of the editor workspace and resizable by
+// dragging its left edge. Collapsed it falls back to the 48px icon rail the
+// other sidebars use.
+export const chatPanelDefaultWidth = 380;
+export const chatPanelMinWidth = 300;
+export const chatPanelMaxWidth = 640;
+
 export const OFFSET = 200;
 export const VIEWPORT_WIDTH = 810;
 export const VIEWPORT_HEIGHT = 540;

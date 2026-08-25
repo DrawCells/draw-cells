@@ -29,27 +29,27 @@ export default function BaseSidebar({isOpen, toggleOpen, children, iconRenderer,
 
   let styles = {}
   const smallDrawerWidth = parseInt(theme.spacing(6).replace("px", ""))
+  // Positioned against #editor-workspace, which spans the card below the header,
+  // so these fill their container rather than offsetting from the viewport.
   if (anchor === 'left') {
     styles = {
       top: 0,
       left: 0,
-      height: `calc(100vh - ${theme.spacing(8)}`,
+      height: '100%',
       width: isOpen ? leftDrawerWidth : smallDrawerWidth,
       borderRight: 'solid 1px #ddd',
       transition: 'width 0.3s ease-out',
       zIndex: 5,
-      marginTop: theme.spacing(8),
     }
   } else if (anchor === 'right') {
     styles = {
       top: 0,
       right: 0,
-      height: `calc(100vh - ${theme.spacing(8)}`,
+      height: '100%',
       width: isOpen ? rightDrawerWidth : smallDrawerWidth,
       borderLeft: 'solid 1px #ddd',
       transition: 'width 0.3s ease-out',
       zIndex: 5,
-      marginTop: theme.spacing(8),
     }
   } else if (anchor === 'bottom') {
     styles = {

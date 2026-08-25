@@ -1,3 +1,4 @@
+import AutoAwesome from "@mui/icons-material/AutoAwesome";
 import Close from "@mui/icons-material/Close";
 import Edit from "@mui/icons-material/Edit";
 import Save from "@mui/icons-material/Save";
@@ -21,6 +22,7 @@ import { useParams, useRouter } from "next/navigation";
 import { renamePresentation } from "../actions";
 import { updatePresentationTitle, undo, redo } from "../../Frames/actions";
 import { toggleModal } from "../../Presentation/actions";
+import { toggleAiChat } from "../../Sidebars/actions";
 import State from "../../stateInterface";
 import ExportVideo from "./ExportVideo";
 
@@ -40,6 +42,9 @@ const CanvasHeader = () => {
   const { id: presentationId } = useParams<{ id: string }>();
   const canUndo = useSelector((state: State) => state.frames._past.length > 0);
   const canRedo = useSelector((state: State) => state.frames._future.length > 0);
+  const isAiChatOpen = useSelector(
+    (state: State) => state.sidebars.isAiChatOpen,
+  );
 
   useEffect(() => {
     setCurrentTitle(presentationTitle);
@@ -151,6 +156,18 @@ const CanvasHeader = () => {
             </IconButton>
           </span>
         </Tooltip>
+        <Button
+          color="inherit"
+          startIcon={<AutoAwesome />}
+          onClick={() => dispatch(toggleAiChat())}
+          sx={{
+            mr: 1,
+            bgcolor: isAiChatOpen ? "rgba(255,255,255,0.18)" : "transparent",
+            "&:hover": { bgcolor: "rgba(255,255,255,0.25)" },
+          }}
+        >
+          Build with AI
+        </Button>
         <Button
           color="inherit"
           onClick={() => router.push("/")}

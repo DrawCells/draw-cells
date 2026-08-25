@@ -3,6 +3,7 @@ export const Actions = {
   SET_LEFT_PANEL: "SET_LEFT_PANEL",
   TOGGLE_FRAMES: "TOGGLE_FRAMES",
   TOGGLE_PROPERTIES: "TOGGLE_PROPERTIES",
+  TOGGLE_AI_CHAT: "TOGGLE_AI_CHAT",
   LOAD_BACKGROUNDS: "LOAD_BACKGROUNDS",
   LOAD_SPRITES: "LOAD_SPRITES",
 };
@@ -25,6 +26,12 @@ export const toggleFrames = () => ({
 
 export const toggleProperties = () => ({
   type: Actions.TOGGLE_PROPERTIES,
+});
+
+// Drives both the chat column and the editor's card layout, so it lives in the
+// store rather than in the panel: the header button toggles it too.
+export const toggleAiChat = () => ({
+  type: Actions.TOGGLE_AI_CHAT,
 });
 
 export const loadBackgrounds = (payload: {

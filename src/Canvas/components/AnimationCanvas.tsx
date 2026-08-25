@@ -1,12 +1,15 @@
 "use client";
 
-import { CircularProgress, useTheme } from "@mui/material";
+import { Box, CircularProgress, useTheme } from "@mui/material";
 import React, { useEffect, useRef, useState } from "react";
 import { DndProvider, useDrop, XYCoord } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { Layer, Rect, Stage, Transformer } from "react-konva";
 import { useDispatch, useSelector } from "react-redux";
 import {
+  editorCardShadow,
+  editorPageBg,
+  editorPagePadding,
   leftDrawerWidth,
   OFFSET,
   VIEWPORT_HEIGHT,
@@ -27,6 +30,7 @@ import {
   updateSprites,
 } from "../../Frames/actions";
 import { Sprite } from "../../Frames/reducers/frames";
+import ChatPanel from "../../Ai/components/ChatPanel";
 import Header from "../../Header/components/CanvasHeader";
 import PresentationModal from "../../Presentation/components/PresentationModal";
 import FramesSidebar from "../../Sidebars/components/FramesSidebar";
@@ -44,16 +48,63 @@ import { CustomDragLayer } from "./CustomDragLayer";
 import { useParams } from "next/navigation";
 
 export default function AnimationCanvasContainer() {
+  // Opening the chat pulls the editor back into a rounded card on a dark page,
+  // with the chat as a separate card beside it. Closed, the editor goes back to
+  // filling the viewport edge to edge — the card only earns its keep when there
+  // is something sitting next to it.
+  const isAiChatOpen = useSelector((state: State) => state.sidebars.isAiChatOpen);
+
   return (
     <DndProvider backend={HTML5Backend}>
-      <Header />
-      <div className="App">
-        <CustomDragLayer />
-        <AnimationCanvas />
-        <SpritesSidebar />
-        <FramesSidebar />
-        <PropertiesSidebar />
-      </div>
+      <Box
+        sx={{
+          height: "100vh",
+          display: "flex",
+          boxSizing: "border-box",
+          bgcolor: isAiChatOpen ? editorPageBg : "#fff",
+          p: isAiChatOpen ? `${editorPagePadding}px` : 0,
+          gap: isAiChatOpen ? `${editorPagePadding}px` : 0,
+          transition: "padding 0.25s ease-out, background-color 0.25s ease-out",
+        }}
+      >
+        {/*
+          Everything inside the card is sized against the card rather than the
+          viewport, so `#editor-workspace` is the positioning context the
+          sidebars anchor to.
+        */}
+        <Box
+          sx={{
+            flexGrow: 1,
+            minWidth: 0,
+            display: "flex",
+            flexDirection: "column",
+            bgcolor: "#fff",
+            overflow: "hidden",
+            borderRadius: isAiChatOpen ? 3 : 0,
+            boxShadow: isAiChatOpen ? editorCardShadow : "none",
+            transition: "border-radius 0.25s ease-out",
+          }}
+        >
+          <Header />
+          <div
+            id="editor-workspace"
+            className="App"
+            style={{
+              position: "relative",
+              flexGrow: 1,
+              minHeight: 0,
+              overflow: "hidden",
+            }}
+          >
+            <CustomDragLayer />
+            <AnimationCanvas />
+            <SpritesSidebar />
+            <FramesSidebar />
+            <PropertiesSidebar />
+          </div>
+        </Box>
+        <ChatPanel />
+      </Box>
       <PresentationModal />
     </DndProvider>
   );
@@ -100,7 +151,6 @@ function AnimationCanvas() {
 
   const theme = useTheme();
   const smallDrawerWidth: number = parseInt(theme.spacing(6).replace("px", ""));
-  const headerHeight: number = parseInt(theme.spacing(8).replace("px", ""));
 
   const { id: presentationId } = useParams();
 
@@ -123,22 +173,19 @@ function AnimationCanvas() {
       hasLoadedRef.current = true;
       setIsLoading(false);
 
-      const scrollX =
-        (VIEWPORT_WIDTH * 2 +
-          OFFSET * 2 -
-          (window.innerWidth - smallDrawerWidth * 2)) /
-        2;
-      const scrollY =
-        (VIEWPORT_HEIGHT * 2 +
-          OFFSET * 2 -
-          (window.innerHeight - smallDrawerWidth - headerHeight)) /
-        2;
-      if (scrollContainerRef.current) {
-        scrollContainerRef.current.scrollTo(scrollX, scrollY);
+      // Centre the viewport in the scrollable area. Measured off the scroll
+      // container itself rather than the window, because the editor now sits
+      // inside a padded card and no longer spans the viewport.
+      const el = scrollContainerRef.current;
+      if (el) {
+        el.scrollTo(
+          (VIEWPORT_WIDTH * 2 + OFFSET * 2 - el.clientWidth) / 2,
+          (VIEWPORT_HEIGHT * 2 + OFFSET * 2 - el.clientHeight) / 2,
+        );
       }
     };
     getData();
-  }, [presentationId, headerHeight, smallDrawerWidth, dispatch]);
+  }, [presentationId, dispatch]);
 
   // DEBOUNCED SAVE TO DB
   useEffect(() => {
@@ -204,14 +251,16 @@ function AnimationCanvas() {
   }, [sprites, currentFrameId, isAnimationPreviewModalOpen, dispatch]);
 
   // STYLING
-  const canvasWidth = `calc(100vw - ${
+  // Percentages resolve against #editor-workspace (the card's body row), not the
+  // viewport: the header is a sibling of the workspace, so only the collapsed
+  // frames rail at the bottom has to be subtracted here.
+  const canvasWidth = `calc(100% - ${
     smallDrawerWidth +
     (isSpritesSidebarOpen ? leftDrawerWidth : smallDrawerWidth)
   }px)`;
 
   const containerStyle: any = {
-    flexGrow: 1,
-    height: `calc(100vh - ${headerHeight + smallDrawerWidth}px)`,
+    height: `calc(100% - ${smallDrawerWidth}px)`,
     display: "flex",
     flexDirection: "column",
     marginLeft: isSpritesSidebarOpen ? leftDrawerWidth : smallDrawerWidth,
@@ -482,17 +531,10 @@ function AnimationCanvas() {
       // if we are on empty place of the stage we will do nothing
       return;
     }
-    // show menu
-    setMenuState({
-      mouseX:
-        e.target.getStage().getPointerPosition().x -
-        scrollContainerRef.current.scrollLeft +
-        50,
-      mouseY:
-        e.target.getStage().getPointerPosition().y -
-        scrollContainerRef.current.scrollTop +
-        50,
-    });
+    // Anchor off the raw pointer event: MUI's anchorPosition is viewport-based,
+    // and stage coordinates would need the workspace's own offset added back in
+    // now that the editor is inset inside the card.
+    setMenuState({ mouseX: e.evt.clientX, mouseY: e.evt.clientY });
   };
 
   // SPRITE TRANSFORMATIONS
