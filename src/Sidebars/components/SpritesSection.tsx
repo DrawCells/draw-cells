@@ -59,7 +59,7 @@ export default function SpritesSection({ active }: { active: boolean }) {
   }, [searchTerm]);
 
   // When a search term is active, query the server route. Substring filtering
-  // (name/tags) and tag-weighted ordering both happen server-side in Postgres.
+  // (name/tags) and name-first relevance ordering happen server-side in Postgres.
   useEffect(() => {
     if (!debouncedSearchTerm || !active) {
       setSearchResults([]);

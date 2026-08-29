@@ -85,9 +85,12 @@ create index if not exists sprites_tags_idx on sprites using gin (tags);
 alter table sprites enable row level security; -- deny-all; secret-key only
 
 -- Sprite search. Filters by substring on name OR any tag (matching the old
--- client-side Firebase filter), and orders results by tag WEIGHT: rows where a
--- tag exactly equals the term come first, ranked by that tag's position in the
--- ordered `tags` array (array_position); the rest follow by name. Called via the
+-- client-side Firebase filter). NAME is the primary criterion and tags are the
+-- secondary one, so every name hit outranks every tag-only hit. Within the name
+-- band the match gets tighter the higher it ranks (exact > prefix > word start >
+-- anywhere), and within the tag band an exact tag outranks a substring one.
+-- Ties break on tag WEIGHT: the position of the exactly-matching tag in the
+-- ordered `tags` array, so the first tag is the strongest. Called via the
 -- secret-key client (supabaseAdmin.rpc), so it doesn't need security definer.
 create or replace function search_sprites(search text, result_limit int default 200)
 returns setof sprites
@@ -101,6 +104,16 @@ as $$
        select 1 from unnest(s.tags) as tag where tag ilike '%' || search || '%'
      )
   order by
+    case
+      when lower(s.name) = lower(search) then 0
+      when s.name ilike search || '%' then 1
+      when s.name ilike '% ' || search || '%' then 2
+      when s.name ilike '%' || search || '%' then 3
+      when exists (
+        select 1 from unnest(s.tags) as tag where lower(tag) = lower(search)
+      ) then 4
+      else 5
+    end asc,
     (
       select min(ord)
       from unnest(s.tags) with ordinality as t(tag, ord)
