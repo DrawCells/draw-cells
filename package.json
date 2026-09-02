@@ -49,6 +49,7 @@
     "upload:sprites": "tsx scripts/uploadSpritesToDb.ts",
     "generate:sprite-map": "tsx scripts/generateSpriteMap.ts",
     "import:sprites": "tsx scripts/importSpritesFromCsv.ts",
+    "copy:sprites": "tsx scripts/copySpritesBetweenProjects.ts",
     "migrate:signed-urls": "tsx scripts/migrateSignedUrlsToStoragePaths.ts",
     "migrate:storage-to-s3": "tsx scripts/migrateStorageToS3.ts",
     "migrate:sprites-to-supabase": "tsx scripts/migrateSpritesToSupabase.ts",
