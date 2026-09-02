@@ -27,3 +27,4 @@ yarn-error.log*
 
 drawcells-service-account.json
 tsconfig.tsbuildinfo
+supabase/.temp/

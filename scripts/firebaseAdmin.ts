@@ -1,3 +1,7 @@
+// Firebase is no longer part of the app — this lives in scripts/ so only the
+// one-shot migration scripts can reach it. `firebase-admin` is a devDependency
+// for the same reason: it must never end up in the Next.js bundle. Once the
+// production cutover is verified, this file and the migrate* scripts can go.
 import admin from "firebase-admin";
 
 const serviceAccount = JSON.parse(

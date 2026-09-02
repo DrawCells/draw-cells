@@ -1,6 +1,6 @@
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "../../../lib/firebaseAdmin";
+import { supabaseAdmin } from "../../../lib/supabaseAdmin";
 
 const lambdaClient = new LambdaClient({
   region: "eu-central-1",
@@ -44,7 +44,9 @@ export async function POST(req: NextRequest) {
     const appUrl = process.env.APP_URL!;
     const callbackUrl = `${appUrl}/api/export-video/callback`;
 
-    await db.ref(`exportJobs/${jobId}`).set({ status: "pending" });
+    await supabaseAdmin
+      .from("export_jobs")
+      .upsert({ id: jobId, status: "pending" });
 
     await invokeLambda({ ...body, jobId, callbackUrl });
 

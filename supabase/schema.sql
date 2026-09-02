@@ -1,0 +1,179 @@
+-- Supabase schema for the Firebase -> Supabase migration (data + auth together).
+-- Run in the Supabase SQL editor, or with `supabase db push`.
+--
+-- Access model: Auth is Supabase Auth, so RLS is keyed on auth.uid(). User-scoped
+-- reads/writes go through the authenticated @supabase/ssr client (RLS enforces
+-- ownership). The secret-key client (lib/supabaseAdmin.ts) bypasses RLS and is
+-- used only for admin/seed/migration/Lambda-callback work.
+
+create extension if not exists "pgcrypto"; -- provides gen_random_uuid()
+
+-- Keep updated_at fresh on any UPDATE.
+create or replace function set_updated_at() returns trigger as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$ language plpgsql;
+
+-- ---------------------------------------------------------------------------
+-- profiles: app-level user data keyed to the Supabase auth user. Holds the
+-- first/last name (today only in Firebase displayName) and the admin flag
+-- (today the ADMIN_EMAILS env allowlist). Populated by a signup trigger.
+-- ---------------------------------------------------------------------------
+create table if not exists profiles (
+  id         uuid primary key references auth.users (id) on delete cascade,
+  email      text,
+  first_name text,
+  last_name  text,
+  is_admin   boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+alter table profiles enable row level security;
+
+create policy "profiles: read own" on profiles
+  for select using (auth.uid() = id);
+create policy "profiles: update own" on profiles
+  for update using (auth.uid() = id) with check (auth.uid() = id);
+
+-- Maps each migrated Supabase user back to its old Firebase uid. Set by the user
+-- migration script; Phase 5 joins on it to remap presentations.user_id. Can be
+-- dropped once the migration is fully verified.
+alter table profiles add column if not exists firebase_uid text unique;
+
+-- Create a profile row whenever a new auth user signs up. Reads first/last name
+-- from the signup metadata (user_metadata.first_name / last_name).
+create or replace function handle_new_user() returns trigger as $$
+begin
+  insert into public.profiles (id, email, first_name, last_name)
+  values (
+    new.id,
+    new.email,
+    new.raw_user_meta_data ->> 'first_name',
+    new.raw_user_meta_data ->> 'last_name'
+  )
+  on conflict (id) do nothing;
+  return new;
+end;
+$$ language plpgsql security definer set search_path = public;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function handle_new_user();
+
+-- ---------------------------------------------------------------------------
+-- sprites: read-only catalog, seeded from src/constants. Served through the
+-- /api/sprites route (weighted tag search needs raw SQL), so it stays RLS
+-- deny-by-default and is read via the secret-key client. `tags` is an ORDERED
+-- array: a tag's position is its search weight (array_position(tags, 'x')).
+-- ---------------------------------------------------------------------------
+create table if not exists sprites (
+  id             uuid primary key default gen_random_uuid(),
+  name           text not null,
+  category       text not null,
+  base_image_url text not null,
+  tags           text[] not null default '{}',
+  variants       text[] not null default '{}',
+  created_at     timestamptz not null default now(),
+  unique (category, name)
+);
+create index if not exists sprites_name_idx on sprites (name);
+create index if not exists sprites_tags_idx on sprites using gin (tags);
+
+alter table sprites enable row level security; -- deny-all; secret-key only
+
+-- Sprite search. Filters by substring on name OR any tag (matching the old
+-- client-side Firebase filter). NAME is the primary criterion and tags are the
+-- secondary one, so every name hit outranks every tag-only hit. Within the name
+-- band the match gets tighter the higher it ranks (exact > prefix > word start >
+-- anywhere), and within the tag band an exact tag outranks a substring one.
+-- Ties break on tag WEIGHT: the position of the exactly-matching tag in the
+-- ordered `tags` array, so the first tag is the strongest. Called via the
+-- secret-key client (supabaseAdmin.rpc), so it doesn't need security definer.
+create or replace function search_sprites(search text, result_limit int default 200)
+returns setof sprites
+language sql
+stable
+as $$
+  select s.*
+  from sprites s
+  where s.name ilike '%' || search || '%'
+     or exists (
+       select 1 from unnest(s.tags) as tag where tag ilike '%' || search || '%'
+     )
+  order by
+    case
+      when lower(s.name) = lower(search) then 0
+      when s.name ilike search || '%' then 1
+      when s.name ilike '% ' || search || '%' then 2
+      when s.name ilike '%' || search || '%' then 3
+      when exists (
+        select 1 from unnest(s.tags) as tag where lower(tag) = lower(search)
+      ) then 4
+      else 5
+    end asc,
+    (
+      select min(ord)
+      from unnest(s.tags) with ordinality as t(tag, ord)
+      where lower(t.tag) = lower(search)
+    ) asc nulls last,
+    s.name asc
+  limit result_limit;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- presentations: `frames` kept as a JSON document (app loads/saves the whole
+-- array), so Frame/Sprite TS types carry over unchanged. Replaces both
+-- /presentations and /user-presentations from RTDB. RLS scopes rows to owner.
+-- ---------------------------------------------------------------------------
+create table if not exists presentations (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid not null references auth.users (id) on delete cascade,
+  title         text not null default 'New Presentation',
+  preview_image text,
+  frames        jsonb not null default '[]'::jsonb,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+create index if not exists presentations_user_id_idx on presentations (user_id);
+
+-- Traceability + idempotency for the RTDB migration: the old Firebase push key.
+-- Null for presentations created after the migration. Can be dropped in Phase 6.
+alter table presentations add column if not exists firebase_id text unique;
+
+create trigger presentations_set_updated_at
+  before update on presentations
+  for each row execute function set_updated_at();
+
+alter table presentations enable row level security;
+
+create policy "presentations: read own" on presentations
+  for select using (auth.uid() = user_id);
+create policy "presentations: insert own" on presentations
+  for insert with check (auth.uid() = user_id);
+create policy "presentations: update own" on presentations
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "presentations: delete own" on presentations
+  for delete using (auth.uid() = user_id);
+
+-- ---------------------------------------------------------------------------
+-- export_jobs: ephemeral; id generated app-side and echoed by the video-export
+-- Lambda callback. Written/read only server-side via the secret-key client,
+-- so RLS stays deny-by-default.
+-- ---------------------------------------------------------------------------
+create table if not exists export_jobs (
+  id         text primary key,
+  status     text not null default 'pending',
+  video_url  text,
+  error      text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create trigger export_jobs_set_updated_at
+  before update on export_jobs
+  for each row execute function set_updated_at();
+
+alter table export_jobs enable row level security; -- deny-all; secret-key only

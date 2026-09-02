@@ -2,17 +2,8 @@ import { Box, CircularProgress, TextField, Typography } from "@mui/material";
 import InfiniteScroll from "react-infinite-scroll-component";
 import { useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import {
-  get,
-  limitToFirst,
-  orderByKey,
-  query,
-  ref,
-  startAfter,
-} from "firebase/database";
 import { loadSprites } from "../actions";
 import State from "../../stateInterface";
-import { db } from "../../firebase-config";
 import SidebarSpriteWithVariants from "../../Sprites/SidebarSpriteWithVariants";
 
 interface SpriteInfo {
@@ -59,7 +50,6 @@ export default function SpritesSection({ active }: { active: boolean }) {
   const dispatch = useDispatch();
   const sprites = useSelector((state: State) => state.sidebars.sprites);
   const hasLoadedOnceRef = useRef(false);
-  const lastKeyRef = useRef<string | undefined>(undefined);
   const searchIdRef = useRef(0);
   const [page, setPage] = useState(0);
 
@@ -68,9 +58,8 @@ export default function SpritesSection({ active }: { active: boolean }) {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // When a search term is active, fetch all sprites from the database and filter locally.
-  // Firebase RTDB doesn't support substring or multi-field queries, so client-side
-  // filtering is applied after fetching all records.
+  // When a search term is active, query the server route. Substring filtering
+  // (name/tags) and name-first relevance ordering happen server-side in Postgres.
   useEffect(() => {
     if (!debouncedSearchTerm || !active) {
       setSearchResults([]);
@@ -81,20 +70,14 @@ export default function SpritesSection({ active }: { active: boolean }) {
     setIsSearching(true);
 
     const runSearch = async () => {
-      const res = await get(ref(db, "sprites"));
-      const data = (res.val() || {}) as Record<string, SpriteInfo>;
-      const term = debouncedSearchTerm.toLowerCase();
-
-      const matching = Object.entries(data).filter(([, sprite]) => {
-        const nameMatch = sprite.name?.toLowerCase().includes(term);
-        const tagsMatch = (sprite.tags || []).some((tag) =>
-          tag.toLowerCase().includes(term),
-        );
-        return nameMatch || tagsMatch;
-      });
+      const res = await fetch(
+        `/api/sprites?search=${encodeURIComponent(debouncedSearchTerm)}`,
+      );
+      const data = await res.json();
+      const matching = (data.sprites || []) as SpriteInfo[];
 
       const list = await Promise.all(
-        matching.map(([id, sprite]) => resolveSpriteImageUrl(id, sprite)),
+        matching.map((sprite) => resolveSpriteImageUrl(sprite.id ?? "", sprite)),
       );
 
       if (currentId !== searchIdRef.current) return;
@@ -119,29 +102,21 @@ export default function SpritesSection({ active }: { active: boolean }) {
     const getSprites = async () => {
       if (page === 0) hasLoadedOnceRef.current = true;
 
-      const spriteQuery = lastKeyRef.current
-        ? query(
-            ref(db, "sprites"),
-            orderByKey(),
-            startAfter(lastKeyRef.current),
-            limitToFirst(PAGE_SIZE),
-          )
-        : query(ref(db, "sprites"), orderByKey(), limitToFirst(PAGE_SIZE));
-
-      const res = await get(spriteQuery);
-      const data = (res.val() || {}) as Record<string, SpriteInfo>;
-      const entries = Object.entries(data);
-
-      if (entries.length > 0) {
-        lastKeyRef.current = entries[entries.length - 1][0];
-      }
+      const res = await fetch(
+        `/api/sprites?limit=${PAGE_SIZE}&offset=${page * PAGE_SIZE}`,
+      );
+      const data = await res.json();
+      const entries = (data.sprites || []) as SpriteInfo[];
 
       const list = await Promise.all(
-        entries.map(([id, sprite]) => resolveSpriteImageUrl(id, sprite)),
+        entries.map((sprite) => resolveSpriteImageUrl(sprite.id ?? "", sprite)),
       );
 
       dispatch(
-        loadSprites({ sprites: list, hasEnded: entries.length < PAGE_SIZE }),
+        loadSprites({
+          sprites: list,
+          hasEnded: data.hasEnded ?? entries.length < PAGE_SIZE,
+        }),
       );
     };
 

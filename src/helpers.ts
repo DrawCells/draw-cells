@@ -185,9 +185,10 @@ export function resolveSpriteUrl(url?: string): string {
   return `/assets/cells/${normalized}`;
 }
 
-// Returns the Firebase Storage path extracted from `url`, or null if not applicable.
-// Handles both bare storage paths (e.g. "sprites/Brain/Neuron.svg") and
-// GCS signed URLs (https://storage.googleapis.com/<bucket>/<path>?X-Goog-*).
+// Returns the object storage key extracted from `url`, or null if not applicable.
+// Normally a bare path (e.g. "sprites/Brain/Neuron.svg"), which is now an S3 key.
+// The storage.googleapis.com branch is a legacy fallback: migrateSignedUrlsToStoragePaths
+// rewrote stored GCS signed URLs to bare paths, so it only catches stragglers.
 function extractStoragePath(url: string): string | null {
   if (
     !url.startsWith("http://") &&
@@ -210,7 +211,7 @@ function extractStoragePath(url: string): string | null {
 }
 
 // Resolves a sprite URL to a usable image src.
-// For Firebase Storage paths and GCS signed URLs, fetches a fresh signed URL.
+// For stored object keys, fetches a fresh presigned S3 URL via /api/storage.
 // Falls back to resolveSpriteUrl for local assets.
 export async function resolveImageUrl(url: string): Promise<string> {
   if (!url) return "";

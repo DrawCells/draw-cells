@@ -126,22 +126,42 @@ const computeNextFrame = (
   return nextFrame;
 };
 
-const computeSpritePosition = (
+// Normalises a payload id list into a lookup set. Ids are opaque strings
+// compared via toString (see generateId), so membership is tested on strings.
+const idSet = (ids: Array<number | string> | undefined): Set<string> =>
+  new Set((ids ?? []).map((id) => id.toString()));
+
+// Position must end up numeric, but its two callers disagree on input type: the
+// properties sidebar's text Inputs emit strings, while the canvas emits floats
+// from Konva node coordinates. parseFloat (rather than the parseInt the sidebar
+// path used to do) keeps the canvas's sub-pixel precision intact.
+const toCoordinate = (value: any): number =>
+  typeof value === "number" ? value : parseFloat(value);
+
+// Applies a field patch to a sprite. `positionX` / `positionY` are addressed as
+// flat fields by callers but live under `position`, so they are mapped here
+// rather than at every call site. Every other field is assigned as given.
+const applySpriteFields = (
   sprite: Sprite,
-  deltaX: number | undefined,
-  deltaY: number | undefined,
+  fields: Record<string, any>,
 ): Sprite => {
-  const newX = (sprite?.position.x || 0) + (deltaX || 0);
-  const newY = (sprite?.position.y || 0) + (deltaY || 0);
-  return {
-    ...sprite,
-    id: sprite.id,
-    position: {
-      ...sprite?.position,
-      x: newX,
-      y: newY,
-    },
-  };
+  let next: Sprite = { ...sprite };
+  for (const [field, value] of Object.entries(fields)) {
+    if (field === "positionX") {
+      next = {
+        ...next,
+        position: { ...next.position, x: toCoordinate(value) },
+      };
+    } else if (field === "positionY") {
+      next = {
+        ...next,
+        position: { ...next.position, y: toCoordinate(value) },
+      };
+    } else {
+      next = { ...next, [field]: value };
+    }
+  }
+  return next;
 };
 
 const computeLinearAnimation = (currentSprite: Sprite, prevSprite: Sprite) => {
@@ -422,22 +442,18 @@ const computeNewFrames = (
 
 const TRACKED_ACTIONS = new Set([
   'ADD_SPRITE',
-  'UPDATE_ALL_SELECTED_SPRITES',
-  'UPDATE_SPRITE',
-  'UPDATE_SPRITE_FIELDS',
-  'REMOVE_CURRENT_SPRITES',
-  'REMOVE_CURRENT_SPRITES_FROM_ALL_FRAMES',
-  'COPY_SPRITE_INTO_FRAME',
-  'COPY_SELECTED_SPRITES_INTO_FRAME',
+  'UPDATE_SPRITES',
+  'REMOVE_SPRITES_BY_IDS',
+  'REMOVE_SPRITES_BY_IDS_FROM_ALL_FRAMES',
+  'COPY_SPRITES_INTO_FRAME',
   'ADD_FRAME',
   'REMOVE_FRAME',
   'REORDER_FRAMES',
-  'UPDATE_CURRENT_SPRITE_POSITION',
-  'SEND_SPRITE_TO_BACK',
-  'BRING_SPRITE_TO_FRONT',
+  'SEND_SPRITES_TO_BACK',
+  'BRING_SPRITES_TO_FRONT',
   'SET_CURRENT_FRAME_BACKGROUND',
-  'GROUP_SPRITES',
-  'UNGROUP_SPRITES',
+  'GROUP_SPRITES_BY_IDS',
+  'UNGROUP_SPRITES_BY_IDS',
 ]);
 
 const snapshot = (state: FramesState): FramesSnapshot => ({
@@ -556,96 +572,33 @@ export const frames = (
         currentFrame: newCurrentFrame,
       };
     }
-    case Actions.UPDATE_ALL_SELECTED_SPRITES: {
-      if (!state.currentSprites || state.currentSprites.length <= 0)
-        return { ...state };
+    // The single sprite-editing case. Callers name the sprites to change, so
+    // editing never depends on (or disturbs) the user's selection. Applying the
+    // whole patch list in one pass means N sprites cost one frame recompute and
+    // one undo entry, not N of each.
+    case Actions.UPDATE_SPRITES: {
+      const patches: Array<{ id: string | number; fields: Record<string, any> }> =
+        payload.patches || [];
 
-      const newCurrentSprites = [];
-      const newCurrentSpritesMap = new Map<string | number, Sprite>();
-      for (let currentSprite of state.currentSprites) {
-        let newCurrentSprite = structuredClone(currentSprite);
-        if (payload.field === "positionX") {
-          newCurrentSprite = {
-            ...newCurrentSprite,
-            position: {
-              x: parseInt(payload.value),
-              y: newCurrentSprite?.position?.y || 0,
-            },
-          };
-        } else if (payload.field === "positionY") {
-          newCurrentSprite = {
-            ...newCurrentSprite,
-            position: {
-              x: newCurrentSprite?.position?.x || 0,
-              y: parseInt(payload.value),
-            },
-          };
-        } else {
-          newCurrentSprite = {
-            ...newCurrentSprite,
-            [payload.field]: payload.value,
-          };
-        }
-        newCurrentSprites.push(newCurrentSprite);
-        newCurrentSprite.id &&
-          newCurrentSpritesMap.set(newCurrentSprite.id, newCurrentSprite);
+      // Collapse to one merged patch per sprite so several patches naming the
+      // same sprite apply in order rather than the last one winning.
+      const patchById = new Map<string, Record<string, any>>();
+      for (const patch of patches) {
+        if (patch?.id == null) continue;
+        const key = patch.id.toString();
+        patchById.set(key, { ...(patchById.get(key) ?? {}), ...(patch.fields ?? {}) });
       }
+      if (patchById.size === 0) return state;
+
+      const patched = (sprite: Sprite): Sprite | null => {
+        const fields = patchById.get(sprite.id.toString());
+        return fields ? applySpriteFields(sprite, fields) : null;
+      };
+
       const crtFrame = {
         ...state.currentFrame,
-        sprites: state.currentFrame.sprites.map((s) => {
-          let newS = structuredClone(s);
-          if (s.id && newCurrentSpritesMap.get(s.id))
-            newS = newCurrentSpritesMap.get(s.id)!;
-          return newS;
-        }),
-      };
-      const { frames: newFrames, currentFrame: newCurrentFrame } =
-        computeNewFrames(state.frames, crtFrame);
-      console.log({ newFrames });
-      return {
-        ...state,
-        frames: newFrames,
-        currentFrame: newCurrentFrame,
-        currentSprites: newCurrentSprites,
-      };
-    }
-    case Actions.UPDATE_SPRITE: {
-      const currentSprite = state.currentSprites.find(
-        (s) => s.id.toString() === payload.id.toString(),
-      );
-      if (!currentSprite) return state;
-
-      let newCurrentSprite: Sprite = { ...currentSprite };
-      if (payload.field === "positionX") {
-        newCurrentSprite = {
-          ...newCurrentSprite,
-          position: {
-            x: parseInt(payload.value),
-            y: newCurrentSprite?.position?.y || 0,
-          },
-        };
-      } else if (payload.field === "positionY") {
-        newCurrentSprite = {
-          ...newCurrentSprite,
-          position: {
-            x: newCurrentSprite?.position?.x || 0,
-            y: parseInt(payload.value),
-          },
-        };
-      } else {
-        newCurrentSprite = {
-          ...newCurrentSprite,
-          [payload.field]: payload.value,
-        };
-      }
-
-      const newCurrentSprites = state.currentSprites.map((s) =>
-        s.id === payload.id ? newCurrentSprite : structuredClone(s),
-      );
-      const crtFrame = {
-        ...state.currentFrame,
-        sprites: state.currentFrame.sprites.map((s) =>
-          s.id === payload.id ? newCurrentSprite : structuredClone(s),
+        sprites: state.currentFrame.sprites.map(
+          (s) => patched(s) ?? structuredClone(s),
         ),
       };
       const { frames: newFrames, currentFrame: newCurrentFrame } =
@@ -654,50 +607,19 @@ export const frames = (
         ...state,
         frames: newFrames,
         currentFrame: newCurrentFrame,
-        currentSprites: newCurrentSprites,
+        // Keep the selection in sync when an edited sprite is also selected, so
+        // the properties sidebar reflects the new values.
+        currentSprites: state.currentSprites.map((s) => patched(s) ?? s),
       };
     }
-    case Actions.UPDATE_SPRITE_FIELDS: {
-      const currentSprite = state.currentSprites.find(
-        (s) => s.id.toString() === payload.id.toString(),
-      );
-      if (!currentSprite) return state;
+    case Actions.REMOVE_SPRITES_BY_IDS: {
+      const removed = idSet(payload.ids);
+      if (removed.size === 0) return state;
 
-      let newCurrentSprite: Sprite = { ...currentSprite };
-      for (const [field, value] of Object.entries(payload.fields)) {
-        if (field === 'positionX') {
-          newCurrentSprite = { ...newCurrentSprite, position: { ...newCurrentSprite.position, x: value as number } };
-        } else if (field === 'positionY') {
-          newCurrentSprite = { ...newCurrentSprite, position: { ...newCurrentSprite.position, y: value as number } };
-        } else {
-          newCurrentSprite = { ...newCurrentSprite, [field]: value };
-        }
-      }
-
-      const newCurrentSprites = state.currentSprites.map((s) =>
-        s.id === payload.id ? newCurrentSprite : structuredClone(s),
-      );
-      const crtFrame = {
-        ...state.currentFrame,
-        sprites: state.currentFrame.sprites.map((s) =>
-          s.id === payload.id ? newCurrentSprite : structuredClone(s),
-        ),
-      };
-      const { frames: newFrames, currentFrame: newCurrentFrame } =
-        computeNewFrames(state.frames, crtFrame);
-      return {
-        ...state,
-        frames: newFrames,
-        currentFrame: newCurrentFrame,
-        currentSprites: newCurrentSprites,
-      };
-    }
-    case Actions.REMOVE_CURRENT_SPRITES: {
-      const currentSpritesIds = state.currentSprites.map((x) => x.id);
       const crtFrame = {
         ...state.currentFrame,
         sprites: state.currentFrame.sprites.filter(
-          (s) => currentSpritesIds.indexOf(s.id) < 0,
+          (s) => !removed.has(s.id.toString()),
         ),
       };
       const { frames: newFrames, currentFrame: newCurrentFrame } =
@@ -706,62 +628,56 @@ export const frames = (
         ...state,
         frames: newFrames,
         currentFrame: newCurrentFrame,
-        currentSprites: [],
-      };
-    }
-    case Actions.REMOVE_CURRENT_SPRITES_FROM_ALL_FRAMES: {
-      const currentSpritesIds = state.currentSprites.map((x) => x.id);
-      const crtFrame = {
-        ...state.currentFrame,
-        sprites: state.currentFrame.sprites.filter(
-          (s) => currentSpritesIds.indexOf(s.id) < 0,
+        // Drop only the removed sprites from the selection; anything else the
+        // user had selected stays selected.
+        currentSprites: state.currentSprites.filter(
+          (s) => !removed.has(s.id.toString()),
         ),
       };
-      const newFrames = state.frames.map((f) => ({
+    }
+    case Actions.REMOVE_SPRITES_BY_IDS_FROM_ALL_FRAMES: {
+      const removed = idSet(payload.ids);
+      if (removed.size === 0) return state;
+
+      const keep = (f: Frame): Frame => ({
         ...f,
-        sprites: f.sprites.filter((s) => currentSpritesIds.indexOf(s.id) < 0),
-      }));
+        sprites: f.sprites.filter((s) => !removed.has(s.id.toString())),
+      });
+      const newFrames = state.frames.map(keep);
       return {
         ...state,
         frames: newFrames,
-        currentFrame: crtFrame,
-        currentSprites: [],
+        // Take the current frame from the rebuilt list so it and `frames` stay
+        // the same object rather than two separately-filtered copies.
+        currentFrame:
+          newFrames.find(
+            (f) => f.id?.toString() === state.currentFrame.id?.toString(),
+          ) ?? keep(state.currentFrame),
+        currentSprites: state.currentSprites.filter(
+          (s) => !removed.has(s.id.toString()),
+        ),
       };
     }
-    case Actions.COPY_SPRITE_INTO_FRAME: {
-      const spriteToCopy = state.currentFrame.sprites.find(
-        (s) => s.id === payload.spriteId,
+    // Copies keep their source sprite's id on purpose: computeNewFrames pairs
+    // sprites between adjacent frames by id to derive motion, so a copy sharing
+    // its origin's id is what makes the sprite animate across the two frames.
+    case Actions.COPY_SPRITES_INTO_FRAME: {
+      const toCopy = idSet(payload.ids);
+      if (toCopy.size === 0) return state;
+
+      const spritesToCopy = state.currentFrame.sprites.filter((s) =>
+        toCopy.has(s.id.toString()),
       );
-      if (spriteToCopy) {
-        const newFrames = state.frames.map((f) =>
-          f.id === payload.frameId
-            ? { ...f, sprites: [...f.sprites, structuredClone(spriteToCopy)] }
-            : f,
-        );
-        return {
-          ...state,
-          frames: newFrames,
-        };
-      }
-      return { ...state };
-    }
-    case Actions.COPY_SELECTED_SPRITES_INTO_FRAME: {
-      const currentSpritesIds = state.currentSprites.map((x) => x.id);
-      const spritesToCopy = state.currentFrame.sprites.filter(
-        (s) => currentSpritesIds.indexOf(s.id) > -1,
-      );
-      if (spritesToCopy) {
-        const newFrames = state.frames.map((f) =>
-          f.id === payload.frameId
+      if (spritesToCopy.length === 0) return state;
+
+      return {
+        ...state,
+        frames: state.frames.map((f) =>
+          f.id?.toString() === payload.frameId?.toString()
             ? { ...f, sprites: [...f.sprites, ...structuredClone(spritesToCopy)] }
             : f,
-        );
-        return {
-          ...state,
-          frames: newFrames,
-        };
-      }
-      return { ...state };
+        ),
+      };
     }
     case Actions.ADD_FRAME: {
       const { frame: incomingFrame, afterId } = payload;
@@ -874,22 +790,30 @@ export const frames = (
         ...state,
         currentSprites: [],
       };
-    case Actions.GROUP_SPRITES: {
-      if (state.currentSprites.length < 2) return state;
+    case Actions.GROUP_SPRITES_BY_IDS: {
+      const ids = idSet(payload.ids);
+      if (ids.size < 2) return state;
       const groupId = `group_${Date.now()}`;
-      const ids = new Set(state.currentSprites.map((s) => s.id));
       const applyGroup = (sprites: Sprite[]) =>
-        sprites.map((s) => (ids.has(s.id) ? { ...s, groupId } : s));
+        sprites.map((s) =>
+          ids.has(s.id.toString()) ? { ...s, groupId } : s,
+        );
       return {
         ...state,
         currentFrame: { ...state.currentFrame, sprites: applyGroup(state.currentFrame.sprites) },
         frames: state.frames.map((f) => ({ ...f, sprites: applyGroup(f.sprites) })),
-        currentSprites: state.currentSprites.map((s) => ({ ...s, groupId })),
+        currentSprites: applyGroup(state.currentSprites),
       };
     }
-    case Actions.UNGROUP_SPRITES: {
+    case Actions.UNGROUP_SPRITES_BY_IDS: {
+      const ids = idSet(payload.ids);
+      if (ids.size === 0) return state;
+      // Dissolve every group the named sprites belong to, so ungrouping one
+      // member ungroups the whole group rather than orphaning the rest.
       const groupIds = new Set(
-        state.currentSprites.map((s) => s.groupId).filter(Boolean) as string[],
+        state.currentFrame.sprites
+          .filter((s) => ids.has(s.id.toString()) && s.groupId)
+          .map((s) => s.groupId as string),
       );
       if (groupIds.size === 0) return state;
       const removeGroup = (sprites: Sprite[]) =>
@@ -898,76 +822,8 @@ export const frames = (
         ...state,
         currentFrame: { ...state.currentFrame, sprites: removeGroup(state.currentFrame.sprites) },
         frames: state.frames.map((f) => ({ ...f, sprites: removeGroup(f.sprites) })),
-        currentSprites: state.currentSprites.map((s) => ({ ...s, groupId: undefined })),
+        currentSprites: removeGroup(state.currentSprites),
       };
-    }
-    case Actions.UPDATE_CURRENT_SPRITE_POSITION: {
-      const { id, deltaX, deltaY } = payload;
-      const currentSpritesIds = state.currentSprites.map((x) => x.id);
-      if (
-        state.currentSprites.length > 0 &&
-        currentSpritesIds.indexOf(id) > -1
-      ) {
-        const newCurrentSpritesById = new Map<string | number, Sprite>();
-        for (let crtSprite of state.currentSprites) {
-          if (!crtSprite.id) continue;
-          const newCurrentSprite: Sprite = computeSpritePosition(
-            crtSprite,
-            deltaX,
-            deltaY,
-          );
-          newCurrentSpritesById.set(crtSprite.id, newCurrentSprite);
-        }
-        const newCurrentFrame = {
-          ...state.currentFrame,
-          sprites: state.currentFrame.sprites.map((s) => {
-            let newS = null;
-            if (s.id && newCurrentSpritesById.get(s.id))
-              newS = newCurrentSpritesById.get(s.id);
-            if (newS) return newS;
-            return s;
-          }),
-        };
-        const { frames: newFrames, currentFrame: newCurrentFrameClone } =
-          computeNewFrames(state.frames, newCurrentFrame);
-        return {
-          ...state,
-          frames: newFrames,
-          currentFrame: newCurrentFrameClone,
-          currentSprites: state.currentSprites.map((s) => {
-            let newS = null;
-            if (s.id && newCurrentSpritesById.get(s.id))
-              newS = newCurrentSpritesById.get(s.id);
-            if (newS) return newS;
-            return s;
-          }),
-        };
-      } else {
-        const crtSprite = state.currentFrame.sprites.find((s) => s.id === id);
-        if (!crtSprite) return { ...state };
-
-        const newCurrentSprite = computeSpritePosition(
-          crtSprite,
-          deltaX,
-          deltaY,
-        );
-        const newCurrentFrame = {
-          ...state.currentFrame,
-          sprites: state.currentFrame.sprites.map((s) =>
-            s.id === id ? newCurrentSprite : s,
-          ),
-        };
-        const { frames: newFrames, currentFrame: newCurrentFrameClone } =
-          computeNewFrames(state.frames, newCurrentFrame);
-        return {
-          ...state,
-          frames: newFrames,
-          currentFrame: newCurrentFrameClone,
-          currentSprites: state.currentSprites.map((s) =>
-            s.id === id ? newCurrentSprite : s,
-          ),
-        };
-      }
     }
     case Actions.NEXT_FRAME: {
       let newCrtFrame = state.currentFrame;
@@ -1036,33 +892,36 @@ export const frames = (
         currentFrame: newCurrentFrame,
       };
     }
-    case Actions.SEND_SPRITE_TO_BACK: {
-      let sprites = state.currentFrame.sprites;
-      for (let sprite of state.currentSprites) {
-        sprites = sprites.filter((s) => s.id !== sprite.id);
-        sprites.unshift(sprite);
-      }
-      const updatedFrame = { ...state.currentFrame, sprites };
-      return {
-        ...state,
-        currentFrame: updatedFrame,
-        frames: state.frames.map((f) =>
-          f.id === updatedFrame.id ? updatedFrame : f,
-        ),
+    // Array order is z-order, back to front. Both directions partition the
+    // frame's sprites and re-concatenate, which keeps the moved sprites in their
+    // existing relative order (the previous unshift-in-a-loop reversed them when
+    // sending several to the back) and reorders the frame's own sprite objects
+    // rather than splicing in possibly-stale copies from the selection.
+    case Actions.SEND_SPRITES_TO_BACK:
+    case Actions.BRING_SPRITES_TO_FRONT: {
+      const ids = idSet(payload.ids);
+      if (ids.size === 0) return state;
+
+      const moving = state.currentFrame.sprites.filter((s) =>
+        ids.has(s.id.toString()),
+      );
+      if (moving.length === 0) return state;
+      const rest = state.currentFrame.sprites.filter(
+        (s) => !ids.has(s.id.toString()),
+      );
+
+      const updatedFrame = {
+        ...state.currentFrame,
+        sprites:
+          type === Actions.SEND_SPRITES_TO_BACK
+            ? [...moving, ...rest]
+            : [...rest, ...moving],
       };
-    }
-    case Actions.BRING_SPRITE_TO_FRONT: {
-      let sprites = state.currentFrame.sprites;
-      for (let sprite of state.currentSprites) {
-        sprites = sprites.filter((s) => s.id !== sprite.id);
-        sprites.push(sprite);
-      }
-      const updatedFrame = { ...state.currentFrame, sprites };
       return {
         ...state,
         currentFrame: updatedFrame,
         frames: state.frames.map((f) =>
-          f.id === updatedFrame.id ? updatedFrame : f,
+          f.id?.toString() === updatedFrame.id?.toString() ? updatedFrame : f,
         ),
       };
     }

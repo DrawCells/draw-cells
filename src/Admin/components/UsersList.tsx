@@ -46,7 +46,7 @@ function formatDate(value: string | null): string {
   });
 }
 
-// Firebase timestamps are RFC 1123 strings; parse for sorting, treating
+// Timestamps arrive as ISO 8601 strings; parse for sorting, treating
 // unknown values as oldest.
 function toMillis(value: string | null): number {
   if (!value) return 0;
@@ -67,7 +67,7 @@ export default function UsersList({ users }: UsersListProps) {
             u.uid.toLowerCase().includes(q),
         )
       : users;
-    // Most recent sign-in first, matching the Firebase console default.
+    // Most recent sign-in first, matching the Supabase dashboard default.
     return [...list].sort(
       (a, b) => toMillis(b.lastSignInTime) - toMillis(a.lastSignInTime),
     );

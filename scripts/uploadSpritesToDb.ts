@@ -35,7 +35,7 @@ Object.entries(SPRITES_BY_CATEGORY_TO_SVG_ELEMENT_MAP).forEach(
 );
 
 async function run() {
-  const { db } = await import("../lib/firebaseAdmin");
+  const { db } = await import("./firebaseAdmin");
   await db.ref("sprites").set(sprites);
   // eslint-disable-next-line no-console
   console.log(`Uploaded ${Object.keys(sprites).length} sprites to /sprites`);

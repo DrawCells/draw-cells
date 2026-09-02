@@ -1,7 +1,6 @@
 "use client";
 
 import { CircularProgress, useTheme } from "@mui/material";
-import { get, ref } from "firebase/database";
 import React, { useEffect, useRef, useState } from "react";
 import { DndProvider, useDrop, XYCoord } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -13,19 +12,19 @@ import {
   VIEWPORT_HEIGHT,
   VIEWPORT_WIDTH,
 } from "../../constants";
-import { db } from "../../firebase-config";
 import {
   addCurrentSprite,
   addSprite,
-  groupSprites,
+  groupSpritesByIds,
   loadInitialData,
   setCurrentSprite,
   setFramePreview,
   setIsFramesSaving,
-  ungroupSprites,
+  SpritePatch,
+  ungroupSpritesByIds,
   unselectAllSprites,
-  updateSprite,
-  updateSpriteFields,
+  updateSpriteById,
+  updateSprites,
 } from "../../Frames/actions";
 import { Sprite } from "../../Frames/reducers/frames";
 import Header from "../../Header/components/CanvasHeader";
@@ -118,8 +117,9 @@ function AnimationCanvas() {
     hasLoadedRef.current = false;
     setIsLoading(true);
     const getData = async () => {
-      const res = await get(ref(db, `presentations/${presentationId}`));
-      dispatch(loadInitialData(res.val()));
+      const res = await fetch(`/api/presentations/${presentationId}`);
+      const data = await res.json();
+      dispatch(loadInitialData(data));
       hasLoadedRef.current = true;
       setIsLoading(false);
 
@@ -356,18 +356,19 @@ function AnimationCanvas() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.metaKey || e.ctrlKey) {
+        const ids = selectedSprites.map((s) => s.id);
         if (e.key === "g" && e.shiftKey) {
           e.preventDefault();
-          dispatch(ungroupSprites());
+          dispatch(ungroupSpritesByIds(ids));
         } else if (e.key === "g") {
           e.preventDefault();
-          dispatch(groupSprites());
+          dispatch(groupSpritesByIds(ids));
         }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [dispatch]);
+  }, [dispatch, selectedSprites]);
 
   // SPRITE SELECTION
   const handleSelectSprite = (e: any, id: number | string) => {
@@ -495,62 +496,63 @@ function AnimationCanvas() {
   };
 
   // SPRITE TRANSFORMATIONS
+  // Every transformed node is collected into one dispatch so resizing a
+  // multi-selection is a single frame recompute and a single undo entry.
   const handleTransform = (e: any) => {
     const transformerNode = e.currentTarget;
+    const patches: SpritePatch[] = [];
+
     for (let n of transformerNode.nodes()) {
       const scaleX = n.scaleX();
       const scaleY = n.scaleY();
       n.scaleX(1);
       n.scaleY(1);
 
-      if (n.attrs.spriteKind === "text") {
-        dispatch(
-          updateSpriteFields({
-            id: n.attrs.spriteId,
-            fields: {
-              positionX: n.x(),
-              positionY: n.y(),
-              width: Math.max(20, n.width() * scaleX),
-              height: Math.max(5, n.height() * scaleY),
-              fontSize: Math.max(4, n.fontSize() * scaleY),
-              rotation: n.rotation(),
-            },
-          }),
-        );
-        continue;
-      }
+      const common = {
+        positionX: n.x(),
+        positionY: n.y(),
+        rotation: n.rotation(),
+      };
 
-      dispatch(
-        updateSpriteFields({
-          id: n.attrs.spriteId,
-          fields: {
-            positionX: n.x(),
-            positionY: n.y(),
-            width: Math.max(5, n.width() * scaleX),
-            height: Math.max(5, n.height() * scaleY),
-            rotation: n.rotation(),
-          },
-        }),
-      );
+      patches.push({
+        id: n.attrs.spriteId,
+        fields:
+          n.attrs.spriteKind === "text"
+            ? {
+                ...common,
+                width: Math.max(20, n.width() * scaleX),
+                height: Math.max(5, n.height() * scaleY),
+                fontSize: Math.max(4, n.fontSize() * scaleY),
+              }
+            : {
+                ...common,
+                width: Math.max(5, n.width() * scaleX),
+                height: Math.max(5, n.height() * scaleY),
+              },
+      });
     }
+
+    if (patches.length > 0) dispatch(updateSprites(patches));
   };
 
   // SPRITE DRAG AND DROP INSIDE CANVAS
+  // Dragging one sprite of a multi-selection moves the whole selection by the
+  // same delta — as one dispatch, so undo puts them all back together.
   const handleDrag = (e: any, originalPos: { x: number; y: number }) => {
     const node = e.target;
     const dx = node.x() - originalPos.x;
     const dy = node.y() - originalPos.y;
-    for (const sel of selectedSprites) {
-      dispatch(
-        updateSpriteFields({
+    dispatch(
+      updateSprites(
+        selectedSprites.map((sel) => ({
           id: sel.id,
           fields: {
             positionX: sel.position.x + dx,
             positionY: sel.position.y + dy,
           },
-        }),
-      );
-    }
+        })),
+      ),
+    );
   };
 
   // SET CURSOR
@@ -691,7 +693,7 @@ function AnimationCanvas() {
                               onDragEnd={(e: any) => handleDrag(e, s.position)}
                               onCommit={(fields: Record<string, any>) =>
                                 dispatch(
-                                  updateSpriteFields({ id: s.id, fields }),
+                                  updateSpriteById({ id: s.id, fields }),
                                 )
                               }
                             />
