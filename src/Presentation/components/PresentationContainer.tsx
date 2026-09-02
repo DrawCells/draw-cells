@@ -29,8 +29,18 @@ const PresentationContainer = ({
 }: {
   presentationId?: string;
 }) => {
+  const frames = useSelector((state: State) => state.frames.frames);
   const currentFrame = useSelector((state: State) => state.frames.currentFrame);
   const prevFrame = useSelector((state: State) => state.frames.prevFrame);
+
+  // Sprites animate between two frames, and which of the pair comes first in
+  // the presentation is what decides whether the step plays forward or in
+  // reverse. Frame ids are opaque uuids, so that ordering has to come from the
+  // frames array rather than from the ids themselves.
+  const indexOfFrame = (frame: typeof currentFrame | null) =>
+    frame ? frames.findIndex((f) => f.id === frame.id) : -1;
+  const currentFrameIndex = indexOfFrame(currentFrame);
+  const prevFrameIndex = indexOfFrame(prevFrame);
 
   const currentFrameSpriteIds = currentFrame.sprites.map((s) => s.id);
   const spritesToRemove =
@@ -109,6 +119,8 @@ const PresentationContainer = ({
                   rotation={s.rotation}
                   currentFrame={currentFrame}
                   prevFrame={prevFrame}
+                  currentFrameIndex={currentFrameIndex}
+                  prevFrameIndex={prevFrameIndex}
                   isRemoved={s.opacity === 0}
                 />
               ))}

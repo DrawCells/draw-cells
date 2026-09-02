@@ -381,18 +381,21 @@ const computeNewFrames = (
       ? structuredClone(frames[crtFrameIndex + 1])
       : null;
 
-  const crtFrameSprites = crtFrameClone.sprites.reduce((r: any, s) => {
-    if (!s || !s.id) return r;
-    r[s.id] = structuredClone(s);
-    return r;
-  }, {});
-  const nextFrameSprites = !nextFrame
-    ? {}
-    : nextFrame?.sprites.reduce((r: any, s) => {
-        if (!s || !s.id) return r;
-        r[s.id] = structuredClone(s);
-        return r;
-      }, {});
+  // Index the frames' own sprite objects by id. These lookups are written
+  // through (reverseAnimationProps below), so they must not be clones —
+  // indexing clones meant the reverse props were computed into throwaway
+  // objects and no sprite ever carried them, leaving backward steps with no
+  // motion to play. The frames themselves are already clones, so writing
+  // through them still leaves the incoming state untouched.
+  const byId = (frame: Frame | null): Record<string, Sprite> =>
+    (frame?.sprites ?? []).reduce((r: any, s) => {
+      if (!s || !s.id) return r;
+      r[s.id] = s;
+      return r;
+    }, {});
+
+  const crtFrameSprites = byId(crtFrameClone);
+  const nextFrameSprites = byId(nextFrame);
 
   let newPrevFrame: Frame | null = null;
 
@@ -424,9 +427,12 @@ const computeNewFrames = (
     }
   }
 
+  // The next frame is republished too: the loop above stores its sprites'
+  // reverseAnimationProps, which is the motion a backward step out of it plays.
   const newFrames = frames
     .map((f) => (f.id === crtFrameClone.id ? crtFrameClone : f))
-    .map((f) => (newPrevFrame && f.id === newPrevFrame.id ? newPrevFrame : f));
+    .map((f) => (newPrevFrame && f.id === newPrevFrame.id ? newPrevFrame : f))
+    .map((f) => (nextFrame && f.id === nextFrame.id ? nextFrame : f));
 
   return { frames: newFrames, currentFrame: crtFrameClone };
 };
@@ -519,16 +525,27 @@ export const frames = (
     if (!data.frames || data.frames.length <= 0) {
       return { ...initialState, title: data.title };
     }
-    const nextFrame = computeNextFrame(data.frames, data.frames[0]);
+    // Persisted frames may omit `sprites` entirely; the derivation below
+    // iterates it, so normalise first.
+    let loadedFrames: Array<Frame> = data.frames.map((f: Frame) => ({
+      ...f,
+      sprites: f.sprites || [],
+    }));
+    // Derive each frame's motion up front. Only the forward animationProps are
+    // persisted, so without this a just-loaded presentation carries no
+    // reverseAnimationProps at all and stepping backwards through it animates
+    // nothing — which is all the "/present" and preview views ever do, since
+    // they load and never edit.
+    for (const f of loadedFrames) {
+      loadedFrames = computeNewFrames(loadedFrames, f).frames;
+    }
+    const currentFrame = loadedFrames[0];
     return {
       ...initialState,
       title: data.title,
-      frames: data.frames,
-      currentFrame: {
-        ...data.frames[0],
-        sprites: data.frames[0].sprites || [],
-      },
-      nextFrame: nextFrame,
+      frames: loadedFrames,
+      currentFrame,
+      nextFrame: computeNextFrame(loadedFrames, currentFrame),
     };
   }
 
