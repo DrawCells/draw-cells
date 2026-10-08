@@ -53,6 +53,7 @@ export default function AnimationCanvasContainer() {
   // filling the viewport edge to edge — the card only earns its keep when there
   // is something sitting next to it.
   const isAiChatOpen = useSelector((state: State) => state.sidebars.isAiChatOpen);
+  const isAiBusy = useSelector((state: State) => state.sidebars.isAiBusy);
 
   return (
     <DndProvider backend={HTML5Backend}>
@@ -101,6 +102,38 @@ export default function AnimationCanvasContainer() {
             <SpritesSidebar />
             <FramesSidebar />
             <PropertiesSidebar />
+            {isAiBusy && (
+              // Locks the workspace — canvas, sidebars, drag-and-drop — while
+              // an AI turn runs. The turn's edits still render through it; the
+              // chat panel, outside this card, keeps its stop button.
+              <Box
+                aria-live="polite"
+                sx={{
+                  position: "absolute",
+                  inset: 0,
+                  zIndex: 1300,
+                  cursor: "progress",
+                  bgcolor: "rgba(255,255,255,0.25)",
+                  display: "flex",
+                  alignItems: "flex-start",
+                  justifyContent: "center",
+                  pt: 2,
+                }}
+              >
+                <Box
+                  sx={{
+                    px: 1.5,
+                    py: 0.75,
+                    borderRadius: 999,
+                    bgcolor: "rgba(20,20,20,0.8)",
+                    color: "#fff",
+                    fontSize: 13,
+                  }}
+                >
+                  The assistant is editing — stop it from the chat to take over
+                </Box>
+              </Box>
+            )}
           </div>
         </Box>
         <ChatPanel />
@@ -121,6 +154,7 @@ const initialMenuState: StateProps = {
 
 function AnimationCanvas() {
   const dispatch = useDispatch();
+  const isAiBusy = useSelector((state: State) => state.sidebars.isAiBusy);
 
   const sprites = useSelector(
     (state: State) => state.frames.currentFrame.sprites,
@@ -404,6 +438,7 @@ function AnimationCanvas() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (isAiBusy) return;
       if (e.metaKey || e.ctrlKey) {
         const ids = selectedSprites.map((s) => s.id);
         if (e.key === "g" && e.shiftKey) {
@@ -417,7 +452,7 @@ function AnimationCanvas() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [dispatch, selectedSprites]);
+  }, [dispatch, selectedSprites, isAiBusy]);
 
   // SPRITE SELECTION
   const handleSelectSprite = (e: any, id: number | string) => {

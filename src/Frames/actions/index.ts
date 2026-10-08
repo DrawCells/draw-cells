@@ -46,6 +46,8 @@ export const Actions = {
   REDO: "REDO",
   GROUP_SPRITES_BY_IDS: "GROUP_SPRITES_BY_IDS",
   UNGROUP_SPRITES_BY_IDS: "UNGROUP_SPRITES_BY_IDS",
+  BEGIN_UNDO_GROUP: "BEGIN_UNDO_GROUP",
+  END_UNDO_GROUP: "END_UNDO_GROUP",
 };
 
 export type SpriteId = number | string;
@@ -209,4 +211,16 @@ export const groupSpritesByIds = (ids: SpriteId[]) => ({
 export const ungroupSpritesByIds = (ids: SpriteId[]) => ({
   type: Actions.UNGROUP_SPRITES_BY_IDS,
   payload: { ids },
+});
+
+// Brackets a run of edits that should undo as one step — an AI turn, which is
+// many dispatches but one thing from the user's point of view. Only the first
+// change inside the group records an undo snapshot. Groups do not nest; end
+// one before beginning another.
+export const beginUndoGroup = () => ({
+  type: Actions.BEGIN_UNDO_GROUP,
+});
+
+export const endUndoGroup = () => ({
+  type: Actions.END_UNDO_GROUP,
 });

@@ -2,6 +2,8 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useStore } from "react-redux";
+import { beginUndoGroup, endUndoGroup } from "../Frames/actions";
+import { setAiBusy } from "../Sidebars/actions";
 import { StoreLike } from "./dispatch";
 import { executeTool } from "./executor";
 import { projectPresentation } from "./stateProjection";
@@ -52,6 +54,8 @@ const isText = (b: ContentBlock): b is TextBlock => b.type === "text";
 
 let entrySeq = 0;
 const nextEntryId = () => `e${++entrySeq}`;
+const nextTurnId = () =>
+  `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 export function useAiChat() {
   const store = useStore() as unknown as StoreLike;
@@ -82,8 +86,15 @@ export function useAiChat() {
         { role: "user", content: trimmed },
       ];
       setIsBusy(true);
+      // The whole turn is one undo step, and the editor stays locked for its
+      // duration so the user's own edits cannot fold into that step or move
+      // things between the model reading the canvas and acting on it.
+      store.dispatch(setAiBusy(true));
+      store.dispatch(beginUndoGroup());
 
       const controller = new AbortController();
+      // Correlates this turn's requests in the server's usage log.
+      const turnId = nextTurnId();
       abort.current = controller;
       const stopped = () => controller.signal.aborted;
       // A reset aborts too, but it has already emptied the history — writing
@@ -105,6 +116,8 @@ export function useAiChat() {
             body: JSON.stringify({
               messages: history.current,
               presentationState,
+              turnId,
+              iteration: i,
             }),
             signal: controller.signal,
           });
@@ -185,6 +198,8 @@ export function useAiChat() {
       } finally {
         if (stopped() && !wasReset()) append("tool", "Stopped.");
         if (abort.current === controller) abort.current = null;
+        store.dispatch(endUndoGroup());
+        store.dispatch(setAiBusy(false));
         setIsBusy(false);
       }
     },

@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "../../../lib/auth";
+import { dailyTokenLimit, recordUsage, usedToday } from "../../../lib/aiUsage";
 import { SYSTEM_PROMPT } from "../../../src/Ai/systemPrompt";
 import { AI_TOOLS } from "../../../src/Ai/tools";
 
@@ -35,9 +36,34 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { messages, presentationState } = await req.json();
+  const { messages, presentationState, turnId, iteration } = await req.json();
   if (!Array.isArray(messages) || messages.length === 0) {
     return NextResponse.json({ error: "messages are required" }, { status: 400 });
+  }
+
+  // Checked before every request rather than once per turn, so a long turn
+  // stops at the limit instead of overrunning it. One request can still take a
+  // user slightly past it — usage is only known once the request has run.
+  // Fails closed: a cost limit that lapses whenever the database is unreachable
+  // (or the table has not been created yet) is not a limit.
+  let used: number;
+  try {
+    used = await usedToday(user.uid);
+  } catch (error) {
+    console.error("AI usage check failed", error);
+    return NextResponse.json(
+      { error: "The assistant is unavailable right now. Try again shortly." },
+      { status: 503 },
+    );
+  }
+  if (used >= dailyTokenLimit()) {
+    return NextResponse.json(
+      {
+        error:
+          "You've reached today's limit for the assistant. It resets at midnight UTC.",
+      },
+      { status: 429 },
+    );
   }
 
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -62,6 +88,7 @@ export async function POST(req: NextRequest) {
       ]
     : messages;
 
+  const startedAt = Date.now();
   try {
     const response = await client.beta.messages.create({
       model: MODEL,
@@ -80,6 +107,23 @@ export async function POST(req: NextRequest) {
       ],
       tools: AI_TOOLS,
       messages: withState,
+    });
+
+    // Recorded before anything else reads the response, refusals included —
+    // a refused request is still billed. A failure to record is logged rather
+    // than surfaced: the user already has their answer.
+    try {
+      await recordUsage(user.uid, response.usage);
+    } catch (error) {
+      console.error("AI usage recording failed", error);
+    }
+
+    logUsage({
+      userId: user.uid,
+      turnId,
+      iteration,
+      latencyMs: Date.now() - startedAt,
+      response,
     });
 
     // Check stop_reason before reading content: a refusal can arrive with an
@@ -112,4 +156,50 @@ export async function POST(req: NextRequest) {
       { status: status >= 400 && status < 500 ? status : 500 },
     );
   }
+}
+
+// One structured line per model request, for cost and latency tracking. A turn
+// is several requests; group them by turnId. The number to watch is
+// cacheHitRate: from the second iteration of a turn on, the tools + system +
+// history prefix should be served from cache, so a rate near 0 there means
+// something is invalidating the prefix (see the prompt-caching notes in
+// docs/ai-chat-plan.md).
+function logUsage({
+  userId,
+  turnId,
+  iteration,
+  latencyMs,
+  response,
+}: {
+  userId: string;
+  turnId: unknown;
+  iteration: unknown;
+  latencyMs: number;
+  response: Anthropic.Beta.BetaMessage;
+}) {
+  const usage = response.usage;
+  const cacheRead = usage.cache_read_input_tokens ?? 0;
+  const cacheWrite = usage.cache_creation_input_tokens ?? 0;
+  const promptTokens = usage.input_tokens + cacheRead + cacheWrite;
+  console.info(
+    JSON.stringify({
+      event: "ai_chat_request",
+      userId,
+      turnId: typeof turnId === "string" ? turnId.slice(0, 40) : null,
+      iteration: typeof iteration === "number" ? iteration : null,
+      model: response.model,
+      // A refusal rescued by the fallback model shows up here.
+      fallback: (usage.iterations ?? []).some(
+        (entry) => entry.type === "fallback_message",
+      ),
+      stopReason: response.stop_reason,
+      latencyMs,
+      inputTokens: usage.input_tokens,
+      cacheReadTokens: cacheRead,
+      cacheWriteTokens: cacheWrite,
+      outputTokens: usage.output_tokens,
+      cacheHitRate:
+        promptTokens > 0 ? Number((cacheRead / promptTokens).toFixed(3)) : 0,
+    }),
+  );
 }

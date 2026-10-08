@@ -1,6 +1,6 @@
 # AI Chat — Build Presentations by Describing Them
 
-> **Status:** Phase 0 complete · Phase 1 complete · Phase 2 implemented (verified against the reducer, not yet against the live API) · Phase 3 next · **Last updated:** 2026-10-08
+> **Status:** Phase 0 complete · Phase 1 complete · Phase 2 complete · Phase 3 mostly done (streaming deferred, effort sweep waits on Phase 4 evals) · **Last updated:** 2026-10-09
 >
 > Living document — update statuses and check items off as we progress.
 >
@@ -137,7 +137,7 @@ Target: *"add a neuron in the middle and label it"* works end to end.
       mounted while closed so the conversation survives reopening.
 - [x] **Run it against the live API.** Search and placement work in real use.
 
-### Phase 2 — Full tool surface (implemented, unverified live)
+### Phase 2 — Full tool surface (done)
 
 Target: *"make a 3-frame animation of a virus entering a cell."*
 
@@ -175,7 +175,7 @@ Target: *"make a 3-frame animation of a virus entering a cell."*
       menu): now recomputes motion — it didn't, so copied sprites didn't animate
       until some later edit — and skips sprites the target already has instead
       of duplicating an id within a frame.
-- [ ] **Run the target prompt against the live API.**
+- [x] **Run the target prompt against the live API.** The 3-frame build ran; it surfaced the video-export bugs fixed separately (last frame missing, captions clipped mid-transition).
 
 Known issues found along the way, not yet fixed (both are covered by
 [the animation refactor plan](animation-refactor-plan.md), a separate PR):
@@ -191,18 +191,26 @@ Known issues found along the way, not yet fixed (both are covered by
 
 ### Phase 3 — Production quality
 
-- [ ] **Streaming** (`client.beta.messages.stream`) — for the typing indicator,
-      not for timeout headroom.
-- [ ] **Undo grouping** — one AI turn should be one undo step. It is currently
-      one per tool call, which is better than it was but still not right.
-- [ ] **Concurrency** — the user can drag a sprite mid-turn. Either lock canvas
-      interaction while busy or accept last-write-wins; the projection is already
-      re-read per iteration, which is the load-bearing half.
-- [ ] Cost/latency telemetry from `usage` (already returned by the route),
-      including cache hit rate. If `cache_read_input_tokens` is 0 across turns,
-      something is invalidating the prefix.
-- [ ] Sweep `output_config.effort` — `low`/`medium` are strong on Opus 5 and this
-      is a many-small-tool-calls workload.
+- [x] **Undo grouping** — one AI turn is one undo step.
+      `beginUndoGroup` / `endUndoGroup` bracket the turn in `useAiChat`; inside
+      a group only the first change saves a snapshot. An undo or redo inside an
+      open group re-arms it, so later edits still have a way back. Side effect
+      for everyone: a tracked action whose reducer case returns `state`
+      untouched no longer leaves an empty undo entry.
+- [x] **Concurrency** — chose locking over last-write-wins. `isAiBusy` (sidebars
+      reducer) puts a veil over the editor workspace — canvas, sidebars,
+      drag-and-drop — and disables undo/redo and the group shortcuts while a
+      turn runs. Without it, a user edit mid-turn would also fold into the
+      turn's undo step. The chat panel stays outside the veil so Stop works.
+- [x] **Cost/latency telemetry** — the route logs one `ai_chat_request` JSON
+      line per model request: user, `turnId` + `iteration` (sent by the
+      client), model, whether the fallback ran, stop reason, latency, token
+      counts, and `cacheHitRate`. From iteration 1 onward the hit rate should be
+      high; near 0 means the prefix is being invalidated.
+- [ ] **Streaming** — deferred. Only buys a typing indicator, and changes the
+      route's response protocol (plus mid-stream fallback handling).
+- [ ] Sweep `output_config.effort` — `low`/`medium` may be faster and cheaper
+      for this many-small-tool-calls workload. Needs the Phase 4 evals to judge.
 
 ### Phase 4 — Evals + guardrails
 
@@ -210,7 +218,15 @@ Known issues found along the way, not yet fixed (both are covered by
       Without this there is no way to tell whether a prompt change helped.
 - [ ] Log every `search_sprites` call that returns nothing — that log is the
       tag-curation backlog.
-- [ ] Per-user rate limiting on `/api/chat`.
+- [x] **Per-user daily token limit** on `/api/chat` (`lib/aiUsage.ts`,
+      `ai_usage_daily` + `record_ai_usage`, migration
+      `20261009120100_ai_usage_daily`). Counted in
+      input-token equivalents weighted by Opus 5 prices (output ×5, cache
+      write ×1.25, cache read ×0.1) so it tracks cost; default 2M/day (≈ $10),
+      override with `AI_DAILY_TOKEN_LIMIT`. Checked before every request —
+      a turn stops at the limit, and can overshoot it by one request. Fails
+      closed if the usage table can't be read. Resets at midnight UTC.
+      Revisit the weights if the model changes.
 - [ ] Confirmation for destructive operations once Phase 2 adds them.
 
 ## Setup
@@ -222,7 +238,17 @@ The chat is inert until an API key is present:
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-Without it `/api/chat` returns **503** with an explanatory message rather than
+Optionally, per environment:
+
+```
+AI_DAILY_TOKEN_LIMIT=250000   # input-equivalent tokens per user per day; default 2000000
+```
+
+The daily limit also needs the `20261009120100_ai_usage_daily` migration
+applied to each Supabase project (see `supabase/README.md`) — until then every
+chat request returns 503, because the limit check fails closed.
+
+Without the API key `/api/chat` returns **503** with an explanatory message rather than
 failing opaquely. `@anthropic-ai/sdk` is a runtime dependency; it is imported
 only by the route, never by client code.
 
@@ -257,6 +283,9 @@ real suite** — see Phase 4.
   sharing and derived CHAOTIC path; copy-to-frame skip + recompute +
   `currentFrame` identity; delete current vs all frames; grouping, z-order,
   backgrounds.
+- Phase 3: undo groups — a multi-frame turn undoes and redoes as one step; an
+  empty turn records nothing; undo mid-group re-arms; ungrouped edits stay
+  one step each.
 - Phase 1: system prompt assembles with real constants; tool schemas well formed
   with every parameter documented; `search_sprites` hits the real endpoint, caps
   and reports truncation, encodes queries; executor errors always return as tool

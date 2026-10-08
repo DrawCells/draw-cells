@@ -7,6 +7,7 @@ const initialState: SidebarsState = {
   isFramesOpen: false,
   isPropertiesOpen: false,
   isAiChatOpen: false,
+  isAiBusy: false,
   backgrounds: {
     list: [],
     hasEnded: false,
@@ -26,6 +27,8 @@ export interface SidebarsState {
   isPropertiesOpen: boolean;
   // Opening the AI chat also switches the editor into its card layout.
   isAiChatOpen: boolean;
+  // An AI turn is running; the editor is locked until it ends.
+  isAiBusy: boolean;
   backgrounds: {
     list: Array<any>;
     hasEnded: boolean;
@@ -70,6 +73,11 @@ export const sidebars = (
       return {
         ...state,
         isAiChatOpen: !state.isAiChatOpen,
+      };
+    case Actions.SET_AI_BUSY:
+      return {
+        ...state,
+        isAiBusy: !!action.payload,
       };
     case Actions.LOAD_BACKGROUNDS:
       return {
