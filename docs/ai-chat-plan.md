@@ -1,16 +1,14 @@
 # AI Chat — Build Presentations by Describing Them
 
-> **Status:** Phase 0 complete · Phase 1 complete (unverified against the live API) · Phase 2 next · **Last updated:** 2026-08-08
+> **Status:** Phase 0 complete · Phase 1 complete · Phase 2 implemented (verified against the reducer, not yet against the live API) · Phase 3 next · **Last updated:** 2026-10-08
 >
 > Living document — update statuses and check items off as we progress.
 >
-> **Where things stand:** the chat panel is wired into the editor and the full
-> loop is implemented — the model can search the sprite catalogue and place
-> sprites and text on the current frame. **It has never made a real API call:**
-> `ANTHROPIC_API_KEY` is not set in `.env`, so the route returns 503 until it is.
-> Everything below the API boundary (prompt assembly, tool schemas, executor
-> error handling, reducer behaviour) is covered by checks; the request shape
-> itself is only typechecked against the SDK, not exercised.
+> **Where things stand:** Phase 1 (search, place sprites and text) works in
+> real use. Phase 2 adds the rest of the editing surface — move/resize/restyle,
+> delete, animation, frames, z-order, grouping, variants, backgrounds — and is
+> covered by a scratchpad script driving the real reducer and executor, but has
+> not yet been exercised by the model end to end.
 
 ## Context
 
@@ -116,7 +114,7 @@ Side effects worth knowing (all improvements, all user-visible):
 - Send-to-back no longer reverses the relative order of the moved sprites.
 - Ungrouping via one member now dissolves the whole group.
 
-### Phase 1 — Vertical slice (done, unverified live)
+### Phase 1 — Vertical slice (done)
 
 Target: *"add a neuron in the middle and label it"* works end to end.
 
@@ -137,24 +135,59 @@ Target: *"add a neuron in the middle and label it"* works end to end.
       the sidebars reducer). Opening it switches the editor into a card layout on
       a dark page; closed, the editor is full-bleed as before. The panel stays
       mounted while closed so the conversation survives reopening.
-- [ ] **Run it against the live API.** Needs `ANTHROPIC_API_KEY` (see Setup).
+- [x] **Run it against the live API.** Search and placement work in real use.
 
-### Phase 2 — Full tool surface
+### Phase 2 — Full tool surface (implemented, unverified live)
 
-- [ ] `move_sprite`, `resize_sprite`, `style_text`, `delete_sprites` → the
-      id-addressed actions from Phase 0.
-- [ ] `set_animation` (type, duration, and the CHAOTIC/CIRCULAR parameters) —
-      the app's actual differentiator, and untouched so far.
-- [ ] Frames: `add_frame`, `switch_frame`, `copy_sprites_to_frame`,
-      `set_frame_background`.
-- [ ] Grouping and z-order.
-- [ ] Sprite `variants` — the catalogue has them; Phase 1 ignores them.
-- [ ] Consider persisting the catalogue **name** on AI-added sprites. Sprites
-      store only `backgroundUrl`, so the projection currently derives labels from
-      the filename ("corona virus" from `corona-virus.svg`). Workable, but a
-      stored name would read better across long conversations. Changes the
-      persisted sprite shape.
-- Target: *"make a 3-frame animation of a virus entering a cell."*
+Target: *"make a 3-frame animation of a virus entering a cell."*
+
+- [x] Editing → `update_sprites` (move / resize / rotate / opacity / text /
+      font size / colour, many sprites per call) and `delete_sprites` (current
+      frame or `from_all_frames`). **One tool instead of the four planned**
+      (`move_sprite`, `resize_sprite`, `style_text`): a rearrangement touches
+      several sprites at once, and one call is one `UPDATE_SPRITES` — one
+      recompute, one undo step. Giving an image only `width` or `height` keeps
+      its aspect ratio; changing a text sprite's wording or size refits its box.
+- [x] `set_animation` — type, duration, CHAOTIC range/iterations, CIRCULAR arc
+      angle/direction, clamped to the properties sidebar's ranges. Set on the
+      sprite in the **earlier** frame, because that is what playback reads.
+      Warns when a sprite has no twin in the next frame (nothing will move).
+- [x] Frames: `add_frame` (inserts after current; copies sprites with their ids
+      by default — the sidebar's "clone"), `switch_frame` (handle or 1-based
+      number), `copy_sprites_to_frame`, `list_backgrounds` +
+      `set_frame_background` (clear with `''`).
+- [x] `arrange_sprites` (front/back), `group_sprites`, `ungroup_sprites`.
+- [x] Sprite `variants` — search rows list them; `add_sprite` takes `variant`.
+      The executor keeps an index of search results by `image_url` to rebuild
+      the variant's storage key, since variant and base names can both contain
+      `" - "`.
+- [x] Persist the catalogue **name** on AI-added image sprites (`name?` on
+      `ImageSprite`, optional and additive). The projection prefers it over the
+      filename-derived label.
+- [x] Every sprite tool checks handles against the current frame up front and
+      fails the **whole** call with "it is on frame N, call switch_frame"
+      otherwise — the reducer cases silently ignore off-frame ids, which would
+      read to the model as success.
+- [x] System prompt: "Editing" and "Animation" sections explaining that motion
+      comes from the same handle in adjacent frames.
+- [x] Client iteration cap 12 → 20, sized for a multi-frame build.
+- [x] Reducer fix, `COPY_SPRITES_INTO_FRAME` (also used by the canvas context
+      menu): now recomputes motion — it didn't, so copied sprites didn't animate
+      until some later edit — and skips sprites the target already has instead
+      of duplicating an id within a frame.
+- [ ] **Run the target prompt against the live API.**
+
+Known issues found along the way, not yet fixed (both are covered by
+[the animation refactor plan](animation-refactor-plan.md), a separate PR):
+
+- **Playback direction uses `parseInt` on frame ids** (`AnimationSprite.jsx`,
+  `crtFrameId > prevFrameId`). Ids are UUIDs, so this compares `NaN`s or a
+  leading hex digit, and forward/reverse is effectively arbitrary — including
+  whether the earlier frame's `animationType` / `duration` is the one used.
+  This undermines `set_animation` directly; worth fixing before judging it.
+- `computeNewFrames` computes the next frame's `reverseAnimationProps` on a
+  clone it then discards, so reverse playback into an edited frame can be
+  stale until a full recompute.
 
 ### Phase 3 — Production quality
 
@@ -217,6 +250,13 @@ real suite** — see Phase 4.
   `frames`; grouping needing 2+; z-order preserving relative order.
 - Projection: excludes base64 and derived motion data; omits defaults; handles
   resolve from short form, full id, and report not-found.
+- Phase 2: variant lookup (including names containing " - ") and its error
+  paths; `update_sprites` aspect ratio, clamping, text refit, all-or-nothing
+  rejection, single undo entry; off-frame handles refused with the frame
+  number; `set_animation` clamping and no-next-frame warning; `add_frame` id
+  sharing and derived CHAOTIC path; copy-to-frame skip + recompute +
+  `currentFrame` identity; delete current vs all frames; grouping, z-order,
+  backgrounds.
 - Phase 1: system prompt assembles with real constants; tool schemas well formed
   with every parameter documented; `search_sprites` hits the real endpoint, caps
   and reports truncation, encodes queries; executor errors always return as tool

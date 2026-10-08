@@ -38,9 +38,11 @@ export interface TranscriptEntry {
   text: string;
 }
 
-// A turn is a handful of tool calls, not an open-ended run. Hitting this stops
-// cleanly with a message rather than looping on the user's budget.
-const MAX_ITERATIONS = 12;
+// A turn is a bounded run, not an open-ended one. Hitting this stops cleanly
+// with a message rather than looping on the user's budget. Sized for a short
+// animation: search, place, then an add_frame + update_sprites round trip per
+// extra frame, with room left for the model to recover from an error or two.
+const MAX_ITERATIONS = 20;
 
 // Abort reason that tells the running turn its history was thrown away.
 const RESET = "reset";
@@ -214,6 +216,32 @@ function describeToolCall(call: ToolUseBlock): string {
       return `Placing ${input.name ? `“${input.name}”` : "a sprite"}…`;
     case "add_text":
       return `Adding text “${input.text}”…`;
+    case "update_sprites": {
+      const n = Array.isArray(input.edits) ? input.edits.length : 0;
+      return `Adjusting ${n === 1 ? "a sprite" : `${n} sprites`}…`;
+    }
+    case "delete_sprites":
+      return "Removing sprites…";
+    case "set_animation":
+      return `Setting ${input.type ? input.type.toLowerCase() + " " : ""}animation…`;
+    case "add_frame":
+      return "Adding a frame…";
+    case "switch_frame":
+      return `Switching to frame ${input.frame}…`;
+    case "copy_sprites_to_frame":
+      return `Copying sprites to frame ${input.frame}…`;
+    case "arrange_sprites":
+      return input.to === "back"
+        ? "Sending sprites to the back…"
+        : "Bringing sprites to the front…";
+    case "group_sprites":
+      return "Grouping sprites…";
+    case "ungroup_sprites":
+      return "Ungrouping sprites…";
+    case "list_backgrounds":
+      return "Looking at backgrounds…";
+    case "set_frame_background":
+      return input.path ? "Setting the background…" : "Clearing the background…";
     default:
       return `Running ${call.name}…`;
   }

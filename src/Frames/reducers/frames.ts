@@ -55,6 +55,9 @@ export interface BaseSprite {
 export interface ImageSprite extends BaseSprite {
   kind?: "image";
   backgroundUrl?: string | undefined;
+  // Catalogue name, when known. Optional: sprites dragged from the sidebar and
+  // everything persisted before this field existed have only backgroundUrl.
+  name?: string;
 }
 
 // A text box rendered with a Konva Text node.
@@ -665,18 +668,40 @@ export const frames = (
       const toCopy = idSet(payload.ids);
       if (toCopy.size === 0) return state;
 
-      const spritesToCopy = state.currentFrame.sprites.filter((s) =>
-        toCopy.has(s.id.toString()),
+      const target = state.frames.find(
+        (f) => f.id?.toString() === payload.frameId?.toString(),
+      );
+      if (!target || target.id?.toString() === state.currentFrame.id?.toString()) {
+        return state;
+      }
+
+      // Skip sprites the target already holds: two sprites sharing an id in one
+      // frame would make the id-keyed motion pairing ambiguous.
+      const present = idSet(target.sprites.map((s) => s.id));
+      const spritesToCopy = state.currentFrame.sprites.filter(
+        (s) => toCopy.has(s.id.toString()) && !present.has(s.id.toString()),
       );
       if (spritesToCopy.length === 0) return state;
 
+      let newFrames = state.frames.map((f) =>
+        f === target
+          ? { ...f, sprites: [...f.sprites, ...structuredClone(spritesToCopy)] }
+          : f,
+      );
+      // The copy can land in a frame adjacent to any other, so recompute every
+      // frame's motion rather than only the target's neighbours — otherwise the
+      // sprites just copied into the next frame would not animate towards it.
+      for (const f of newFrames) {
+        newFrames = computeNewFrames(newFrames, f).frames;
+      }
       return {
         ...state,
-        frames: state.frames.map((f) =>
-          f.id?.toString() === payload.frameId?.toString()
-            ? { ...f, sprites: [...f.sprites, ...structuredClone(spritesToCopy)] }
-            : f,
-        ),
+        frames: newFrames,
+        currentFrame:
+          newFrames.find(
+            (f) => f.id?.toString() === state.currentFrame.id?.toString(),
+          ) ?? state.currentFrame,
+        nextFrame: computeNextFrame(newFrames, state.currentFrame),
       };
     }
     case Actions.ADD_FRAME: {

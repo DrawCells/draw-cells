@@ -6,7 +6,7 @@ import ExportProgressDialog, {
 import { useSelector } from "react-redux";
 import State from "../../stateInterface";
 import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH } from "../../constants";
-import { Sprite } from "../../Frames/reducers/frames";
+import { isTextSprite, Sprite } from "../../Frames/reducers/frames";
 import Konva from "konva";
 import ArrowDropDown from "@mui/icons-material/ArrowDropDown";
 import { jsPDF } from "jspdf";
@@ -19,6 +19,12 @@ import { addSpritesToLayer, renderFrameToDataUrl } from "../../helpers";
 const CHUNK_SIZE = 25;
 const UPLOAD_CONCURRENCY = 6;
 const MAX_UPLOAD_RETRIES = 3;
+
+// Images per second of animation. The encoding Lambda (outside this repo)
+// has to use the same rate, or timings stretch or compress.
+const FPS = 30;
+// How long the video stays on the final frame once everything has arrived.
+const FINAL_HOLD_SECONDS = 1;
 
 interface PresignedItem {
   url: string;
@@ -171,57 +177,39 @@ export default function ExportVideo({
         ...frame.sprites.map((s) => s.duration ?? 1),
       );
 
-      for (let i = 0; i < 30 * maxDuration; i++) {
+      for (let i = 0; i < FPS * maxDuration; i++) {
         const newSprites: Sprite[] = [];
         for (const sprite of frame.sprites) {
           const nextSprite = nextFrame.sprites.find((s) => s.id === sprite.id);
-          const currentFrameIndex = Math.min(i, 30 * (sprite.duration ?? 1));
+          const currentFrameIndex = Math.min(i, FPS * (sprite.duration ?? 1));
           if (nextSprite) {
-            const sharedProps = {
-              width:
-                sprite.width +
-                (nextSprite.width - sprite.width) *
-                  (currentFrameIndex / (30 * (sprite.duration ?? 1))),
-              height:
-                sprite.height +
-                (nextSprite.height - sprite.height) *
-                  (currentFrameIndex / (30 * (sprite.duration ?? 1))),
-              rotation:
-                sprite.rotation +
-                (nextSprite.rotation - sprite.rotation) *
-                  (currentFrameIndex / (30 * (sprite.duration ?? 1))),
+            const progress = currentFrameIndex / (FPS * (sprite.duration ?? 1));
+            const lerp = (a: number, b: number) => a + (b - a) * progress;
+            const rotation = lerp(sprite.rotation, nextSprite.rotation);
+            const opacity = lerp(sprite.opacity ?? 1, nextSprite.opacity ?? 1);
+
+            // LINEAR, and the fallback when a path's derived data is missing —
+            // a sprite should still move rather than vanish from the video.
+            let newPosition = {
+              x: lerp(sprite.position.x, nextSprite.position.x),
+              y: lerp(sprite.position.y, nextSprite.position.y),
             };
 
-            if (sprite.animationType === "LINEAR") {
-              const newPosition = {
-                x:
-                  sprite.position.x +
-                  (nextSprite.position.x - sprite.position.x) *
-                    (currentFrameIndex / (30 * (sprite.duration ?? 1))),
-                y:
-                  sprite.position.y +
-                  (nextSprite.position.y - sprite.position.y) *
-                    (currentFrameIndex / (30 * (sprite.duration ?? 1))),
-              };
-              newSprites.push({
-                ...sprite,
-                ...sharedProps,
-                id: `${sprite.id}-${i}`,
-                position: newPosition,
-              });
-            } else if (sprite.animationType === "CIRCULAR") {
-              console.log("CIRCULAR ANIMATION", sprite.animationProps);
+            if (
+              sprite.animationType === "CIRCULAR" &&
+              sprite.animationProps?.circleX != null
+            ) {
               const distanceX =
                 sprite.position.x - sprite.animationProps.circleX;
               const distanceY =
                 sprite.position.y - sprite.animationProps.circleY;
               const angle =
-                ((currentFrameIndex / (30 * (sprite.duration ?? 1))) *
+                (progress *
                   (sprite.angle ?? 0) *
                   (sprite.animationProps.angleDirection * -1) *
                   Math.PI) /
                 180;
-              const newPosition = {
+              newPosition = {
                 x:
                   sprite.animationProps.circleX +
                   Math.cos(angle) * distanceX -
@@ -231,51 +219,83 @@ export default function ExportVideo({
                   Math.sin(angle) * distanceX +
                   Math.cos(angle) * distanceY,
               };
-              newSprites.push({
-                ...sprite,
-                ...sharedProps,
-                id: `${sprite.id}-${i}`,
-                position: newPosition,
-              });
-            } else if (sprite.animationType === "CHAOTIC") {
+            } else if (
+              sprite.animationType === "CHAOTIC" &&
+              Array.isArray(sprite.animationProps) &&
+              sprite.animationProps.length > 0
+            ) {
               const N = sprite.animationProps.length;
-              const F = 30 * (sprite.duration ?? 1);
+              const F = FPS * (sprite.duration ?? 1);
               const s = (i * (N - 1)) / (F - 1);
               const k = Math.floor(s);
               const a = Math.min(k, N - 1);
               const b = Math.min(k + 1, N - 1);
               const t = s - k;
-              let newPosition = { x: sprite.position.x, y: sprite.position.y };
-              if (a === b) {
-                newPosition = {
-                  x: sprite.animationProps[a].x,
-                  y: sprite.animationProps[a].y,
-                };
-              } else {
-                newPosition = {
-                  x:
-                    sprite.animationProps[a].x +
-                    t *
-                      (sprite.animationProps[b].x - sprite.animationProps[a].x),
-                  y:
-                    sprite.animationProps[a].y +
-                    t *
-                      (sprite.animationProps[b].y - sprite.animationProps[a].y),
-                };
-              }
+              newPosition =
+                a === b
+                  ? {
+                      x: sprite.animationProps[a].x,
+                      y: sprite.animationProps[a].y,
+                    }
+                  : {
+                      x:
+                        sprite.animationProps[a].x +
+                        t *
+                          (sprite.animationProps[b].x -
+                            sprite.animationProps[a].x),
+                      y:
+                        sprite.animationProps[a].y +
+                        t *
+                          (sprite.animationProps[b].y -
+                            sprite.animationProps[a].y),
+                    };
+            }
 
+            if (
+              isTextSprite(sprite) &&
+              isTextSprite(nextSprite) &&
+              sprite.text !== nextSprite.text
+            ) {
+              // Wording cannot be interpolated, and drawing either wording in
+              // a box tweening toward the other's size wraps it past the box
+              // height, where Konva drops the overflowing lines. Crossfade
+              // instead: each wording keeps its own box and both follow the
+              // sprite's path.
               newSprites.push({
                 ...sprite,
-                ...sharedProps,
+                id: `${sprite.id}-${i}-out`,
+                position: newPosition,
+                rotation,
+                opacity: opacity * (1 - progress),
+              });
+              newSprites.push({
+                ...nextSprite,
+                id: `${sprite.id}-${i}-in`,
+                position: newPosition,
+                rotation,
+                opacity: opacity * progress,
+              });
+            } else {
+              newSprites.push({
+                ...sprite,
+                width: lerp(sprite.width, nextSprite.width),
+                height: lerp(sprite.height, nextSprite.height),
+                // Resizing a text box on the canvas scales its font with it,
+                // so the font has to tween alongside the box.
+                ...(isTextSprite(sprite) && isTextSprite(nextSprite)
+                  ? { fontSize: lerp(sprite.fontSize, nextSprite.fontSize) }
+                  : {}),
+                rotation,
+                opacity,
                 id: `${sprite.id}-${i}`,
                 position: newPosition,
-              });
+              } as Sprite);
             }
           } else {
             newSprites.push({
               ...sprite,
               id: `${sprite.id}-${i}`,
-              opacity: 1 - Math.min(i, 30) / 30,
+              opacity: 1 - Math.min(i, FPS) / FPS,
               position: { x: sprite.position.x, y: sprite.position.y },
             });
           }
@@ -289,7 +309,7 @@ export default function ExportVideo({
             newSprites.push({
               ...sprite,
               id: `${sprite.id}-${i}`,
-              opacity: Math.min(i, 30) / 30,
+              opacity: Math.min(i, FPS) / FPS,
               position: newPosition,
             });
           }
@@ -300,6 +320,19 @@ export default function ExportVideo({
         ).padStart(4, "0")}.png`;
         frameSpecs.push({ filename, sprites: newSprites });
       }
+    }
+
+    // Each transition above stops one step short of its end state, because
+    // the next transition's first image is that state. The last frame has no
+    // next transition, so it would never appear: render it and hold it.
+    const lastIdx = frames.length - 1;
+    for (let i = 0; i < FPS * FINAL_HOLD_SECONDS; i++) {
+      frameSpecs.push({
+        filename: `frame-${String(lastIdx).padStart(4, "0")}-${String(
+          i,
+        ).padStart(4, "0")}.png`,
+        sprites: frames[lastIdx].sprites,
+      });
     }
 
     try {

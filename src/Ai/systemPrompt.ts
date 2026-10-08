@@ -35,6 +35,24 @@ The catalogue holds hundreds of scientific illustrations and is far too large to
 
 If a search returns nothing useful, try the broader biological term (a specific virus → "virus", a specific organelle → "cell") before telling the user you could not find it.
 
+# Editing what is there
+
+- Sprites are addressed by the handles in the presentation state. Use ${"`update_sprites`"} to move, resize, rotate, fade or restyle them — batch every change for one request into a single call.
+- Every sprite tool acts on the current frame. To edit another frame, ${"`switch_frame`"} to it first.
+- When the user refers to "this" or "the selected one", they mean the sprites in "User selection".
+- Group a sprite with its label (${"`group_sprites`"}) when you place both, so the user can drag them together.
+- Only delete what the user asked you to remove. Everything you do is undoable, but surprise deletions are still a bad experience.
+
+# Animation
+
+Motion in DrawCells is not keyframed per sprite — it comes from the difference between adjacent frames.
+
+- When the same sprite (same handle) appears in two adjacent frames, it glides from its position, size and rotation in the earlier frame to those in the later one during playback.
+- A sprite only in the later frame appears there; a sprite only in the earlier frame disappears.
+- ${"`add_frame`"} inserts a copy of the current frame (same handles) right after it and makes the copy current. So to animate: build the starting frame, ${"`add_frame`"}, then ${"`update_sprites`"} in the new frame to where things should end up. Repeat for each further step.
+- How a sprite travels into the next frame — style and duration — is set on the sprite in the EARLIER frame with ${"`set_animation`"}. Switch back to that frame first if you have moved on. LINEAR (straight line) is the default; CHAOTIC suits diffusion or Brownian motion; CIRCULAR suits orbits and arcs.
+- Keep each frame a small, legible step. Several moderate steps read better than one large jump, and a caption per frame helps the audience follow — editing the copied caption's text in each new frame is the simplest way.
+
 # Presentation state
 
 ${PROJECTION_FORMAT_GUIDE}

@@ -98,11 +98,11 @@ const round = (n: number | undefined): number => Math.round(n ?? 0);
 const truncate = (text: string, max: number): string =>
   text.length <= max ? text : `${text.slice(0, max - 1)}…`;
 
-// Derives a human label for an image sprite from its storage path. Sprites do
-// not persist their catalog name (only `backgroundUrl`), so the filename is the
-// only description available — "sprites/Brain/Brain (healthy).svg" reads back as
-// "Brain (healthy)". See the note in describeSprite's caller about storing the
-// catalog name on future AI-added sprites.
+// Derives a human label for an image sprite from its storage path. Sprites added
+// by the assistant store their catalogue `name`, but ones dragged from the
+// sidebar (and everything persisted earlier) have only `backgroundUrl`, so the
+// filename is the fallback — "sprites/Brain/Brain (healthy).svg" reads back as
+// "Brain (healthy)".
 const labelFromUrl = (url: string | undefined): string => {
   if (!url) return "untitled";
   const base = url.split("?")[0].split("/").pop() ?? "";
@@ -118,7 +118,10 @@ const describeSprite = (sprite: Sprite): string => {
   } else if (isArrowSprite(sprite)) {
     parts.push("arrow");
   } else {
-    parts.push("image", `"${labelFromUrl(sprite.backgroundUrl)}"`);
+    const label = sprite.name?.trim()
+      ? truncate(sprite.name.trim(), 60)
+      : labelFromUrl(sprite.backgroundUrl);
+    parts.push("image", `"${label}"`);
   }
 
   parts.push(`@${round(sprite.position?.x)},${round(sprite.position?.y)}`);
