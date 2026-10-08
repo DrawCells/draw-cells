@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const search = searchParams.get("search")?.trim();
 
-  // Search mode: substring on name/tags, weighted by tag position (see the
+  // Search mode: substring on name/tags, ranked name-first then tags (see the
   // search_sprites SQL function). Returns the full result set (capped).
   if (search) {
     const { data, error } = await supabaseAdmin.rpc("search_sprites", {

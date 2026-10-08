@@ -22,9 +22,13 @@ function getCurrentAndPrevSprite(animationProps) {
 
 export default function AnimationSprite(props) {
   const [prevSprite, currentSprite] = getCurrentAndPrevSprite(props);
-  const { currentFrame, prevFrame } = props;
-  const crtFrameId = parseInt(String(currentFrame.id || "1"));
-  const prevFrameId = parseInt(String(prevFrame?.id || "0"));
+  // Which way the presentation is being stepped, and how far the rotation
+  // spring travels, come from the frames' positions in the presentation — not
+  // from their ids. Ids are opaque uuids (see generateId), so parsing them as
+  // numbers gave NaN for most frames and every comparison against NaN is
+  // false, which silently sent forward steps down the reverse branch.
+  const { currentFrameIndex, prevFrameIndex } = props;
+  const isForward = currentFrameIndex > prevFrameIndex;
 
   const {
     position,
@@ -56,17 +60,16 @@ export default function AnimationSprite(props) {
     reverseAnimationProps,
   } = prevSprite || {};
 
-  const spriteAnimationProps =
-    crtFrameId > prevFrameId ? forwardAnimationProps : reverseAnimationProps;
-  const animationType =
-    crtFrameId > prevFrameId ? forwardAnimationType : reverseAnimationType;
+  const spriteAnimationProps = isForward
+    ? forwardAnimationProps
+    : reverseAnimationProps;
+  const animationType = isForward
+    ? forwardAnimationType
+    : reverseAnimationType;
   const animationDuration =
-    ((crtFrameId > prevFrameId ? forwardDuration : reverseDuration) || 1) *
-    1000;
+    ((isForward ? forwardDuration : reverseDuration) || 1) * 1000;
   const currentNrOfIterations =
-    (crtFrameId > prevFrameId
-      ? forwardNrOfIterations
-      : reverseNrOfIterations) || 10;
+    (isForward ? forwardNrOfIterations : reverseNrOfIterations) || 10;
   const isStatic =
     !prevSprite ||
     (prevSprite?.position?.x === position.x &&
@@ -118,14 +121,21 @@ export default function AnimationSprite(props) {
   const finalAngle = parseInt(spriteAnimationProps?.finalAngle || "90");
   const angleDirection = parseInt(spriteAnimationProps?.angleDirection || "1");
   const { rotateSpring } = useSpring({
-    from: { rotateSpring: prevFrameId },
-    to: { rotateSpring: crtFrameId },
+    from: { rotateSpring: prevFrameIndex },
+    to: { rotateSpring: currentFrameIndex },
     config: { duration: animationDuration },
   });
+  // Interpolation input ranges must ascend, so a backward step is mapped over
+  // the reversed range with its output reversed to match.
+  const rotateRange = isForward
+    ? [prevFrameIndex, currentFrameIndex]
+    : [currentFrameIndex, prevFrameIndex];
+  const rotateOutput = (from, target) =>
+    isForward ? [from, target] : [target, from];
   const rotationProps = to(
     [
       rotateSpring
-        .to([prevFrameId, crtFrameId], [angleDirection * finalAngle, 0])
+        .to(rotateRange, rotateOutput(angleDirection * finalAngle, 0))
         .to((x) => x),
     ],
     (x) => x,
@@ -134,8 +144,11 @@ export default function AnimationSprite(props) {
     [
       rotateSpring
         .to(
-          [prevFrameId, crtFrameId],
-          [prevSprite?.rotation - angleDirection * finalAngle, rotation],
+          rotateRange,
+          rotateOutput(
+            prevSprite?.rotation - angleDirection * finalAngle,
+            rotation,
+          ),
         )
         .to((x) => x),
     ],
@@ -146,7 +159,7 @@ export default function AnimationSprite(props) {
   let animationProps = {};
   let svgProps = { ...scaleProps, ...opacityProps, ...offsetProps };
 
-  if (crtFrameId === prevFrameId || isRemoved || isStatic) {
+  if (currentFrameIndex === prevFrameIndex || isRemoved || isStatic) {
     animationProps = { ...animationProps, ...staticProps };
   } else if (animationType === "LINEAR") {
     animationProps = { ...animationProps, ...linearProps };

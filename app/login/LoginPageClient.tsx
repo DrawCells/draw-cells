@@ -72,6 +72,7 @@ function LoginForm({ toggleForm }: { toggleForm: (mode: string) => void }) {
   }, [state.success, router]);
 
   const handleReset = async () => {
+    if (resetLoading) return;
     setResetLoading(true);
     setResetMsg(null);
     const res = await resetPasswordAction(email);
@@ -107,23 +108,10 @@ function LoginForm({ toggleForm }: { toggleForm: (mode: string) => void }) {
           </Typography>
         )}
         {state.canReset && !resetMsg && (
-          <Box sx={{ mb: 2 }}>
-            <Typography fontSize={13} color="text.secondary" sx={{ mb: 1 }}>
-              Returning user? Your account needs a new password.
-            </Typography>
-            <Button
-              type="button"
-              size="small"
-              onClick={handleReset}
-              disabled={resetLoading || !email}
-            >
-              {resetLoading ? (
-                <CircularProgress size={16} />
-              ) : (
-                "Send password reset link"
-              )}
-            </Button>
-          </Box>
+          <Typography fontSize={13} color="text.secondary" sx={{ mb: 2 }}>
+            Returning user? Your account needs a new password — use the link
+            below.
+          </Typography>
         )}
         {resetMsg && (
           <Typography fontSize={13} color="text.secondary" sx={{ mb: 2 }}>
@@ -149,8 +137,18 @@ function LoginForm({ toggleForm }: { toggleForm: (mode: string) => void }) {
           fullWidth
           variant="standard"
           required
-          sx={{ mb: 3 }}
+          sx={{ mb: 1 }}
         />
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 3 }}>
+          <Link
+            underline="hover"
+            sx={{ fontSize: 14, "&:hover": { cursor: "pointer" } }}
+            onClick={handleReset}
+          >
+            Forgot password?
+          </Link>
+          {resetLoading && <CircularProgress size={14} />}
+        </Box>
         <Typography fontSize="0.9rem">
           {"You don't have an account yet?"}
         </Typography>
