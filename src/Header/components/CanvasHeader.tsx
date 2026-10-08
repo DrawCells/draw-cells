@@ -191,9 +191,6 @@ const CanvasHeader = () => {
         >
           Preview
         </Button>
-        {/* <Button color="inherit" onClick={() => dispatch(recomputeFrames())}>
-          Recompute Frames
-        </Button> */}
         <Button
           color="inherit"
           onClick={() => {

@@ -1,4 +1,4 @@
-import { generateId, getRndInteger } from "../../helpers";
+import { generateId } from "../../helpers";
 import { Actions } from "../actions";
 
 const initialFrame = {
@@ -42,8 +42,6 @@ export interface BaseSprite {
   circleDirection?: number | undefined;
   angle?: number | undefined;
   opacity?: number;
-  animationProps?: any;
-  reverseAnimationProps?: any;
   zIndex?: any;
   width: number;
   height: number;
@@ -171,287 +169,29 @@ const applySpriteFields = (
   return next;
 };
 
-const computeLinearAnimation = (currentSprite: Sprite, prevSprite: Sprite) => {
-  return { x: currentSprite.position.x, y: currentSprite.position.y };
-};
-
-const computeChaoticAnimation = (
-  currentSprite: Sprite,
-  prevSprite: Sprite,
-  reversed: boolean = false,
-) => {
-  if (!prevSprite)
-    return { to: { x: currentSprite.position.x, y: currentSprite.position.y } };
-  const chaoticArray = [];
-  let newLeft = prevSprite.position.x || 0;
-  const leftDistance = currentSprite.position?.x - newLeft;
-  let newTop = prevSprite.position.y || 0;
-  const topDistance = currentSprite.position?.y - newTop;
-
-  const finalMinTravelDistance =
-    (reversed
-      ? currentSprite.minTravelDistance
-      : prevSprite.minTravelDistance) || 15;
-  const rangeOfMotion =
-    (reversed ? currentSprite.rangeOfMovement : prevSprite.rangeOfMovement) ||
-    40;
-  const numberOfIterations =
-    (reversed ? currentSprite.nrOfIterations : prevSprite.nrOfIterations) || 10;
-
-  const leftStep = leftDistance / numberOfIterations;
-  const leftDirection = leftStep < 0 ? -1 : 1;
-  const topStep = topDistance / numberOfIterations;
-  const topDirection = topStep < 0 ? -1 : 1;
-
-  for (let i = 0; i < numberOfIterations; i += 1) {
-    chaoticArray.push({ x: newLeft, y: newTop });
-    let newRandLeft;
-    const fromIntermediaryLeftPoint = Math.round(
-      (prevSprite?.position.x || 0) + leftStep * i,
-    );
-    const toIntermediaryLeftPoint = Math.round(
-      (prevSprite?.position.x || 0) + leftStep * (i + 1),
-    );
-    const fromLeft = fromIntermediaryLeftPoint - rangeOfMotion * leftDirection;
-    const toLeft = toIntermediaryLeftPoint + rangeOfMotion * leftDirection;
-    newRandLeft = getRndInteger(fromLeft, toLeft);
-    if (Math.abs(newRandLeft - newLeft) < finalMinTravelDistance) {
-      newRandLeft += finalMinTravelDistance * leftDirection;
-    }
-    newLeft = newRandLeft;
-
-    let newRandTop;
-    const fromIntermediaryTopPoint = Math.round(
-      (prevSprite?.position.y || 0) + topStep * i,
-    );
-    const toIntermediaryTopPoint = Math.round(
-      (prevSprite?.position.y || 0) + topStep * (i + 1),
-    );
-    const fromTop = fromIntermediaryTopPoint - rangeOfMotion * topDirection;
-    const toTop = toIntermediaryTopPoint + rangeOfMotion * topDirection;
-    newRandTop = getRndInteger(fromTop, toTop);
-    if (Math.abs(newRandTop - newTop) < finalMinTravelDistance) {
-      newRandTop += finalMinTravelDistance * topDirection;
-    }
-    newTop = newRandTop;
-  }
-  chaoticArray.push({
-    x: currentSprite.position.x,
-    y: currentSprite.position.y,
-  });
-  return chaoticArray;
-};
-
-const computeCircularAnimation = (
-  currentSprite: Sprite,
-  prevSprite: Sprite,
-  reversed: boolean = false,
-) => {
-  const circleDirection: number =
-    (reversed ? currentSprite.circleDirection : prevSprite?.circleDirection) ||
-    1;
-  const currentAngle: number =
-    (reversed ? currentSprite?.angle : prevSprite?.angle) || 90;
-  const [x1, y1, x2, y2] = [
-    prevSprite?.position.x || 0,
-    prevSprite?.position.y || 0,
-    currentSprite.position.x,
-    currentSprite.position.y,
-  ];
-  const pointsDistance =
-    Math.round(Math.sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1)) * 100) /
-    100;
-  const radius =
-    Math.round(
-      (pointsDistance / 2 / Math.sin((currentAngle / 2) * (Math.PI / 180))) *
-        100,
-    ) / 100;
-
-  if (x1 === x2 && y1 === y2) {
-    return {
-      distX: 0,
-      distY: 0,
-      circleX: x1,
-      circleY: y1,
-      x1,
-      y1,
-      x2,
-      y2,
-      radius: 0,
-      angleDirection: circleDirection,
-    };
-  }
-
-  let currentCircleDirection = 1;
-  if (y1 <= y2 && x1 <= x2) currentCircleDirection = circleDirection * -1;
-  if (y1 <= y2 && x1 >= x2) currentCircleDirection = circleDirection * 1;
-  if (y1 >= y2 && x1 >= x2) currentCircleDirection = circleDirection * -1;
-  if (y1 >= y2 && x1 <= x2) currentCircleDirection = circleDirection * 1;
-
-  let angleDirection = 1;
-  if (x1 <= x2) angleDirection = circleDirection * -1;
-  if (x1 >= x2) angleDirection = circleDirection * 1;
-
-  const x3 = (x1 + x2) / 2;
-  const y3 = (y1 + y2) / 2;
-  // slope of the perpendicular line through (x1, y1), (x2, y2)
-  const m = Math.round(((x1 - x2) / (y2 - y1)) * 100) / 100;
-  const a = Math.round((m * m + 1) * 100) / 100;
-  const b = Math.round(-2 * (x1 + y1 * m - y3 * m + m * m * x3) * 100) / 100;
-  const c =
-    Math.round(
-      (x1 * x1 +
-        y1 * y1 +
-        2 * y1 * (m * x3 - y3) +
-        m * m * x3 * x3 +
-        y3 * y3 -
-        2 * m * x3 * y3 -
-        radius * radius) *
-        100,
-    ) / 100;
-  const delta = Math.round((b * b - 4 * a * c) * 100) / 100;
-
-  // if delta is negative, we can't find the center of the circle, so we set it to middle of the line
-  if (delta < 0) {
-    return {
-      distX: x3 - x2,
-      distY: y3 - y2,
-      circleX: x3,
-      circleY: y3,
-      x1,
-      y1,
-      x2,
-      y2,
-      radius: pointsDistance / 2,
-      circleDirection: currentCircleDirection,
-      angleDirection,
-    };
-  }
-
-  const circleX = Math.round(
-    (-b + currentCircleDirection * Math.sqrt(delta)) / (2 * a),
-  );
-  const circleY = Math.round(m * circleX - m * x3 + y3);
-
-  const distX = circleX - x2;
-  const distY = circleY - y2;
-
-  return {
-    distX,
-    distY,
-    finalAngle: currentAngle,
-    circleX,
-    circleY,
-    x1,
-    y1,
-    x2,
-    y2,
-    radius,
-    circleDirection: currentCircleDirection,
-    angleDirection,
-  };
-};
-
-const getAnimationProps = (
-  currentSprite: Sprite,
-  prevSprite: Sprite,
-  reversed: boolean = false,
-) => {
-  if (!currentSprite) return {};
-  if (!prevSprite) return computeLinearAnimation(currentSprite, prevSprite);
-  const animationType = reversed
-    ? currentSprite.animationType
-    : prevSprite.animationType;
-  switch (animationType) {
-    case "LINEAR": {
-      return computeLinearAnimation(currentSprite, prevSprite);
-    }
-    case "CHAOTIC": {
-      return computeChaoticAnimation(currentSprite, prevSprite, reversed);
-    }
-    case "CIRCULAR": {
-      return computeCircularAnimation(currentSprite, prevSprite, reversed);
-    }
-  }
-};
-
-const computeNewFrames = (
+// Writes an edited current frame back into the frames list. Motion between
+// frames is no longer stored on sprites: src/Animation/sample.ts derives it
+// from the two frames' sprites whenever it is drawn.
+const replaceFrame = (
   frames: Array<Frame>,
   crtFrame: Frame,
 ): { frames: Array<Frame>; currentFrame: Frame } => {
   const crtFrameClone = structuredClone(crtFrame);
-  const crtFrameIndex = frames.map((f) => f.id).indexOf(crtFrame.id);
-  const prevFrame =
-    crtFrameIndex - 1 >= 0 ? structuredClone(frames[crtFrameIndex - 1]) : null;
-  const nextFrame =
-    crtFrameIndex + 1 < frames.length
-      ? structuredClone(frames[crtFrameIndex + 1])
-      : null;
-
-  // Index the frames' own sprite objects by id. These lookups are written
-  // through (reverseAnimationProps below), so they must not be clones —
-  // indexing clones meant the reverse props were computed into throwaway
-  // objects and no sprite ever carried them, leaving backward steps with no
-  // motion to play. The frames themselves are already clones, so writing
-  // through them still leaves the incoming state untouched.
-  const byId = (frame: Frame | null): Record<string, Sprite> =>
-    (frame?.sprites ?? []).reduce((r: any, s) => {
-      if (!s || !s.id) return r;
-      r[s.id] = s;
-      return r;
-    }, {});
-
-  const crtFrameSprites = byId(crtFrameClone);
-  const nextFrameSprites = byId(nextFrame);
-
-  let newPrevFrame: Frame | null = null;
-
-  if (prevFrame?.sprites) {
-    newPrevFrame = {
-      ...prevFrame,
-      sprites: prevFrame.sprites.map((s) => structuredClone(s)),
-    };
-    for (let s of newPrevFrame.sprites) {
-      s.animationProps = getAnimationProps(crtFrameSprites[s.id], s);
-      if (crtFrameSprites[s.id]) {
-        crtFrameSprites[s.id].reverseAnimationProps = getAnimationProps(
-          s,
-          crtFrameSprites[s.id],
-          true,
-        );
-      }
-    }
-  }
-
-  for (let s of crtFrameClone.sprites) {
-    s.animationProps = getAnimationProps(nextFrameSprites[s.id], s);
-    if (nextFrame && nextFrameSprites[s.id]) {
-      nextFrameSprites[s.id].reverseAnimationProps = getAnimationProps(
-        s,
-        nextFrameSprites[s.id],
-        true,
-      );
-    }
-  }
-
-  // The next frame is republished too: the loop above stores its sprites'
-  // reverseAnimationProps, which is the motion a backward step out of it plays.
-  const newFrames = frames
-    .map((f) => (f.id === crtFrameClone.id ? crtFrameClone : f))
-    .map((f) => (newPrevFrame && f.id === newPrevFrame.id ? newPrevFrame : f))
-    .map((f) => (nextFrame && f.id === nextFrame.id ? nextFrame : f));
-
-  return { frames: newFrames, currentFrame: crtFrameClone };
+  return {
+    frames: frames.map((f) => (f.id === crtFrameClone.id ? crtFrameClone : f)),
+    currentFrame: crtFrameClone,
+  };
 };
 
-// Possibly need in the future for Copy/Remove from all frames
-// const computeAllNewFrames = (frames: Array<Frame>) => {
-//   let newFrames = frames
-//   for (let i = 0; i < frames.length; i++) {
-//     newFrames = computeNewFrames(newFrames, newFrames[i])
-//   }
-//   return newFrames
-// }
+// Presentations saved before motion was derived on the fly carry it in these
+// fields. Dropping them on load means the next save no longer stores them.
+const withoutStoredMotion = (sprite: Sprite): Sprite => {
+  const { animationProps, reverseAnimationProps, ...rest } = sprite as Sprite & {
+    animationProps?: unknown;
+    reverseAnimationProps?: unknown;
+  };
+  return rest;
+};
 
 const TRACKED_ACTIONS = new Set([
   'ADD_SPRITE',
@@ -546,20 +286,11 @@ export const frames = (
     if (!data.frames || data.frames.length <= 0) {
       return { ...initialState, title: data.title };
     }
-    // Persisted frames may omit `sprites` entirely; the derivation below
-    // iterates it, so normalise first.
-    let loadedFrames: Array<Frame> = data.frames.map((f: Frame) => ({
+    // Persisted frames may omit `sprites` entirely, so normalise first.
+    const loadedFrames: Array<Frame> = data.frames.map((f: Frame) => ({
       ...f,
-      sprites: f.sprites || [],
+      sprites: (f.sprites || []).map(withoutStoredMotion),
     }));
-    // Derive each frame's motion up front. Only the forward animationProps are
-    // persisted, so without this a just-loaded presentation carries no
-    // reverseAnimationProps at all and stepping backwards through it animates
-    // nothing — which is all the "/present" and preview views ever do, since
-    // they load and never edit.
-    for (const f of loadedFrames) {
-      loadedFrames = computeNewFrames(loadedFrames, f).frames;
-    }
     const currentFrame = loadedFrames[0];
     return {
       ...initialState,
@@ -599,7 +330,7 @@ export const frames = (
         sprites: [...structuredClone(state.currentFrame.sprites), newSprite],
       };
       const { frames: newFrames, currentFrame: newCurrentFrame } =
-        computeNewFrames(structuredClone(state.frames), crtFrame);
+        replaceFrame(state.frames, crtFrame);
       return {
         ...state,
         frames: newFrames,
@@ -636,7 +367,7 @@ export const frames = (
         ),
       };
       const { frames: newFrames, currentFrame: newCurrentFrame } =
-        computeNewFrames(state.frames, crtFrame);
+        replaceFrame(state.frames, crtFrame);
       return {
         ...state,
         frames: newFrames,
@@ -657,7 +388,7 @@ export const frames = (
         ),
       };
       const { frames: newFrames, currentFrame: newCurrentFrame } =
-        computeNewFrames(state.frames, crtFrame);
+        replaceFrame(state.frames, crtFrame);
       return {
         ...state,
         frames: newFrames,
@@ -692,8 +423,8 @@ export const frames = (
         ),
       };
     }
-    // Copies keep their source sprite's id on purpose: computeNewFrames pairs
-    // sprites between adjacent frames by id to derive motion, so a copy sharing
+    // Copies keep their source sprite's id on purpose: playback and export
+    // pair sprites between adjacent frames by id to derive motion, so a copy sharing
     // its origin's id is what makes the sprite animate across the two frames.
     case Actions.COPY_SPRITES_INTO_FRAME: {
       const toCopy = idSet(payload.ids);
@@ -714,17 +445,11 @@ export const frames = (
       );
       if (spritesToCopy.length === 0) return state;
 
-      let newFrames = state.frames.map((f) =>
+      const newFrames = state.frames.map((f) =>
         f === target
           ? { ...f, sprites: [...f.sprites, ...structuredClone(spritesToCopy)] }
           : f,
       );
-      // The copy can land in a frame adjacent to any other, so recompute every
-      // frame's motion rather than only the target's neighbours — otherwise the
-      // sprites just copied into the next frame would not animate towards it.
-      for (const f of newFrames) {
-        newFrames = computeNewFrames(newFrames, f).frames;
-      }
       return {
         ...state,
         frames: newFrames,
@@ -754,7 +479,7 @@ export const frames = (
         baseFrames = [...state.frames, frame];
       }
       const { frames: newFrames, currentFrame: newCurrentFrame } =
-        computeNewFrames(baseFrames, frame);
+        replaceFrame(baseFrames, frame);
       const nextFrame = computeNextFrame(newFrames, newCurrentFrame);
 
       return {
@@ -805,16 +530,6 @@ export const frames = (
         currentFrame: crtFrame,
         nextFrame: nextFrame,
         currentSprites: newCurrentSprites,
-      };
-    }
-    case Actions.RECOMPUTE_FRAMES: {
-      let frames = state.frames;
-      for (let f of frames) {
-        frames = computeNewFrames(frames, f).frames;
-      }
-      return {
-        ...state,
-        frames,
       };
     }
     case Actions.SET_CURRENT_SPRITE: {
@@ -996,12 +711,9 @@ export const frames = (
     }
     case Actions.REORDER_FRAMES: {
       const { fromIndex, toIndex } = payload;
-      let newFrames = [...state.frames];
+      const newFrames = [...state.frames];
       const [moved] = newFrames.splice(fromIndex, 1);
       newFrames.splice(toIndex, 0, moved);
-      for (const f of newFrames) {
-        newFrames = computeNewFrames(newFrames, f).frames;
-      }
       const newCurrentFrame = newFrames.find((f) => f.id === state.currentFrame.id) || state.currentFrame;
       return {
         ...state,

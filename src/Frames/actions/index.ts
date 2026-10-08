@@ -26,7 +26,6 @@ export const Actions = {
   ADD_FRAME: "ADD_FRAME",
   REMOVE_FRAME: "REMOVE_FRAME",
   REORDER_FRAMES: "REORDER_FRAMES",
-  RECOMPUTE_FRAMES: "RECOMPUTE_FRAMES",
   NEXT_FRAME: "NEXT_FRAME",
   PREV_FRAME: "PREV_FRAME",
   UPDATE_SPRITES: "UPDATE_SPRITES",
@@ -177,10 +176,6 @@ export const sendSpritesToBack = (ids: SpriteId[]) => ({
 export const bringSpritesToFront = (ids: SpriteId[]) => ({
   type: Actions.BRING_SPRITES_TO_FRONT,
   payload: { ids },
-});
-
-export const recomputeFrames = () => ({
-  type: Actions.RECOMPUTE_FRAMES,
 });
 
 export const setCurrentFrameBackground = (background: string) => ({

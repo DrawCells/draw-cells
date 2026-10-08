@@ -10,12 +10,8 @@ import {
   nextAnimationFrame,
   prevAnimationFrame,
 } from "../../Frames/actions";
-import {
-  isArrowSprite,
-  isImageSprite,
-  isTextSprite,
-  Sprite,
-} from "../../Frames/reducers/frames";
+import { sampleFrames, transitionSeconds } from "../../Animation/sample";
+import { useTransitionClock } from "../../Animation/useTransitionClock";
 import AnimationSprite from "../../Sprites/AnimationSprite";
 import State from "../../stateInterface";
 
@@ -39,14 +35,23 @@ const PresentationContainer = ({
   // frames array rather than from the ids themselves.
   const indexOfFrame = (frame: typeof currentFrame | null) =>
     frame ? frames.findIndex((f) => f.id === frame.id) : -1;
-  const currentFrameIndex = indexOfFrame(currentFrame);
-  const prevFrameIndex = indexOfFrame(prevFrame);
+  const isForward = indexOfFrame(prevFrame) <= indexOfFrame(currentFrame);
 
-  const currentFrameSpriteIds = currentFrame.sprites.map((s) => s.id);
-  const spritesToRemove =
-    prevFrame?.sprites
-      .filter((s) => currentFrameSpriteIds.indexOf(s.id) < 0)
-      .map((s) => ({ ...s, opacity: 0 })) || [];
+  // A transition always runs from the earlier frame to the later one, and the
+  // earlier frame's sprite settings govern it. Stepping backwards plays that
+  // same transition in reverse. With no previous frame, everything fades in.
+  const earlier = isForward ? prevFrame?.sprites ?? [] : currentFrame.sprites;
+  const later = isForward ? currentFrame.sprites : prevFrame?.sprites ?? [];
+  const totalSeconds = transitionSeconds(earlier, later);
+  const elapsed = useTransitionClock(
+    `${prevFrame?.id}->${currentFrame.id}`,
+    totalSeconds,
+  );
+  const sprites = sampleFrames(
+    earlier,
+    later,
+    isForward ? elapsed : totalSeconds - elapsed,
+  );
 
   const dispatch = useDispatch();
 
@@ -90,40 +95,9 @@ const PresentationContainer = ({
           }}
         >
           <Layer>
-            {currentFrame.sprites
-              .concat(...spritesToRemove)
-              .map((s: Sprite) => (
-                <AnimationSprite
-                  kind={s.kind}
-                  backgroundUrl={isImageSprite(s) ? s.backgroundUrl : undefined}
-                  text={isTextSprite(s) ? s.text : undefined}
-                  fontSize={isTextSprite(s) ? s.fontSize : undefined}
-                  fontFamily={isTextSprite(s) ? s.fontFamily : undefined}
-                  fontStyle={isTextSprite(s) ? s.fontStyle : undefined}
-                  fill={isTextSprite(s) ? s.fill : undefined}
-                  align={isTextSprite(s) ? s.align : undefined}
-                  stroke={isArrowSprite(s) ? s.stroke : undefined}
-                  id={s.id}
-                  position={s.position}
-                  key={`animation-${s.id}`}
-                  animationType={s.animationType}
-                  scale={s.scale}
-                  // angle={s.angle}
-                  opacity={s.opacity}
-                  animationProps={s.animationProps}
-                  duration={s.duration}
-                  nrOfIterations={s.nrOfIterations}
-                  // zIndex={s.zIndex}
-                  width={s.width}
-                  height={s.height}
-                  rotation={s.rotation}
-                  currentFrame={currentFrame}
-                  prevFrame={prevFrame}
-                  currentFrameIndex={currentFrameIndex}
-                  prevFrameIndex={prevFrameIndex}
-                  isRemoved={s.opacity === 0}
-                />
-              ))}
+            {sprites.map((s) => (
+              <AnimationSprite key={`animation-${s.id}`} sprite={s} />
+            ))}
           </Layer>
         </Stage>
       </div>

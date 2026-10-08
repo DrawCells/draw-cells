@@ -732,14 +732,8 @@ function AnimationCanvas() {
                         <React.Fragment key={s.id}>
                           {isSelected && nextFrameSprite && (
                             <AnimationCanvasPreview
-                              x1={s.position.x}
-                              y1={s.position.y}
-                              animationProps={s.animationProps}
-                              animationType={s.animationType}
-                              width1={s.width}
-                              height1={s.height}
-                              width2={nextFrameSprite.width}
-                              height2={nextFrameSprite.height}
+                              from={s}
+                              to={nextFrameSprite}
                             />
                           )}
                           {s.kind === "text" ? (

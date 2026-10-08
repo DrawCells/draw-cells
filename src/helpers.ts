@@ -166,10 +166,6 @@ export async function renderFrameToDataUrl(sprites: Sprite[]): Promise<string> {
   return dataUrl;
 }
 
-export function getRndInteger(min: number, max: number): number {
-  return Math.floor(Math.random() * (max - min)) + min;
-}
-
 export function resolveSpriteUrl(url?: string): string {
   if (!url) return "";
   const normalized = url.trim();

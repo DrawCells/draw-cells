@@ -1,110 +1,42 @@
 import React from "react";
 import { Arrow, Circle, Rect } from "react-konva";
+import { circularArc, motionPath } from "../../Animation/sample";
+import { Sprite } from "../../Frames/reducers/frames";
 
 interface AnimationCanvasPreviewProps {
-  x1: number;
-  y1: number;
-  animationProps: any;
-  animationType: string | undefined;
-  width1: number;
-  width2: number;
-  height1: number;
-  height2: number;
+  // The selected sprite on the current frame, and the same sprite on the
+  // next frame.
+  from: Sprite;
+  to: Sprite;
 }
 
+// Shows where a selected sprite will travel to reach the next frame. The
+// route comes from the same code playback and export use, so it is exactly
+// the path the sprite will take.
 export default function AnimationCanvasPreview({
-  x1,
-  y1,
-  animationProps,
-  animationType,
-  width2,
-  height2,
+  from,
+  to,
 }: AnimationCanvasPreviewProps) {
-  let otherPoints: any = [];
-  let tension = 0;
-  let midX = 0,
-    midY = 0;
-  let nx,
-    ny = 0;
+  const points = motionPath(from, to);
+  if (points.some((p) => !Number.isFinite(p))) return null;
 
-  if (!animationProps) {
-    return <></>;
-  }
-
-  if (animationType === "LINEAR") {
-    otherPoints = [
-      animationProps.x + width2 / 2,
-      animationProps.y + height2 / 2,
-    ];
-  } else if (animationType === "CHAOTIC") {
-    otherPoints = animationProps
-      .slice(0)
-      .map((p: any) => [p.x, p.y])
-      .flat();
-  } else if (animationType === "CIRCULAR") {
-    const {
-      radius: r,
-      x2,
-      y2,
-      circleX,
-      circleY,
-      circleDirection,
-    } = animationProps;
-    tension = 0.8;
-    // Coordinates of the middle of initial point and final point (we'll call it N)
-    nx = (x1 + x2) / 2;
-    ny = (y1 + y2) / 2;
-    let m;
-
-    if (nx === circleX && ny === circleY) {
-      m = Math.round(((x1 - x2) / (y2 - y1)) * 100) / 100;
-    } else {
-      // Slope of the line going through circle center and N
-      m = Math.round(((ny - circleY) / (nx - circleX)) * 100) / 100;
-    }
-    // Constant for slope line formula (y=mx + c)
-    const mc = m * nx - ny;
-
-    // Solve quadratic equation to find the mid point of the arc
-    const a = Math.round((m * m + 1) * 100) / 100;
-    const b =
-      -Math.round((2 * circleX + 2 * m * circleY + 2 * m * mc) * 100) / 100;
-    const c =
-      Math.round(
-        (circleX * circleX +
-          circleY * circleY +
-          2 * circleY * mc +
-          mc * mc -
-          r * r) *
-          100,
-      ) / 100;
-    const delta = b * b - 4 * a * c;
-    midX = (-b - circleDirection * Math.sqrt(delta)) / (2 * a);
-    midY = m * midX - mc;
-
-    otherPoints = [midX, midY, x2, y2];
-  }
-
-  const points = [x1, y1, ...otherPoints];
-  if (points.some((p) => typeof p !== "number" || Number.isNaN(p))) {
-    return <></>;
-  }
+  const arc = from.animationType === "CIRCULAR" ? circularArc(from, to) : null;
 
   return (
     <>
-      {animationType === "CIRCULAR" && (
+      {arc && (
         <>
           <Rect
-            x={animationProps.circleX}
-            y={animationProps.circleY}
+            x={arc.center.x}
+            y={arc.center.y}
             width={5}
             height={5}
             fill="red"
           />
           <Circle
-            x={animationProps.circleX}
-            y={animationProps.circleY}
-            radius={animationProps.r}
+            x={arc.center.x}
+            y={arc.center.y}
+            radius={arc.radius}
             stroke="black"
             strokeWidth={2}
           />
@@ -112,7 +44,6 @@ export default function AnimationCanvasPreview({
       )}
       <Arrow
         points={points}
-        tension={tension}
         pointerLength={10}
         pointerWidth={10}
         fill="#888"
