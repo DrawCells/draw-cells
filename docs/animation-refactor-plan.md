@@ -1,6 +1,6 @@
 # Animation Refactor — One Sampling Function, One Clock
 
-> **Status:** Proposed, not started · **Last updated:** 2026-10-08
+> **Status:** Done — all four steps, React Spring removed · **Last updated:** 2026-10-09
 >
 > Planned as its own PR, separate from the AI chat work.
 
@@ -111,12 +111,23 @@ function does.
 
 ## Steps
 
-- [ ] Extract `sampleSprite` from `ExportVideo.tsx` and add tests for it.
-- [ ] Rewrite `AnimationSprite` to use it with one clock (fixes the UUID
-      direction bug and circular motion).
-- [ ] Switch `ExportVideo.tsx` to call it.
-- [ ] Stop storing `animationProps` / `reverseAnimationProps`; seed CHAOTIC
-      randomness from ids. **Changes the saved data:** existing presentations
-      keep their old fields, which are simply ignored.
+- [x] Extract `sampleSprite` from `ExportVideo.tsx` and add tests for it.
+      Lives in `src/Animation/sample.ts` (with `sampleFrames` /
+      `transitionSeconds` for whole frames); tests run with `npm test`.
+- [x] Rewrite `AnimationSprite` to use it with one clock (fixes the UUID
+      direction bug and circular motion). The clock is
+      `src/Animation/useTransitionClock.ts` (`requestAnimationFrame`), and
+      `@react-spring/konva` is no longer a dependency.
+- [x] Switch `ExportVideo.tsx` to call it.
+- [x] Stop storing `animationProps` / `reverseAnimationProps`; seed CHAOTIC
+      randomness from ids. **Changes the saved data:** the old fields are
+      dropped when a presentation loads, so its next save no longer stores
+      them. The seed is the sprite id plus its move's endpoints and chaotic
+      settings (not the frame id, which `sampleSprite` never sees), so a path
+      only changes when that sprite's own move does. The circle centre is
+      solved exactly from the chord and the signed sweep instead of the
+      rounded quadratic, and the editor's path overlay
+      (`AnimationCanvasPreview`) draws `motionPath`, the same route playback
+      takes.
 
 The first three steps ship without touching saved data.
