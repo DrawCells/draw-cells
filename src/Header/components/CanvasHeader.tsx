@@ -1,3 +1,4 @@
+import AutoAwesome from "@mui/icons-material/AutoAwesome";
 import Close from "@mui/icons-material/Close";
 import Edit from "@mui/icons-material/Edit";
 import Save from "@mui/icons-material/Save";
@@ -21,6 +22,7 @@ import { useParams, useRouter } from "next/navigation";
 import { renamePresentation } from "../actions";
 import { updatePresentationTitle, undo, redo } from "../../Frames/actions";
 import { toggleModal } from "../../Presentation/actions";
+import { toggleAiChat } from "../../Sidebars/actions";
 import State from "../../stateInterface";
 import ExportVideo from "./ExportVideo";
 
@@ -38,8 +40,19 @@ const CanvasHeader = () => {
   const [isTitleEditing, setIsTitleEditing] = useState(false);
   const [currentTitle, setCurrentTitle] = useState(presentationTitle);
   const { id: presentationId } = useParams<{ id: string }>();
-  const canUndo = useSelector((state: State) => state.frames._past.length > 0);
-  const canRedo = useSelector((state: State) => state.frames._future.length > 0);
+  // Undo is off while an AI turn runs: the turn is being recorded as one undo
+  // step, and undoing underneath it would pull the canvas out from under the
+  // model's next tool call.
+  const isAiBusy = useSelector((state: State) => state.sidebars.isAiBusy);
+  const canUndo = useSelector(
+    (state: State) => state.frames._past.length > 0 && !state.sidebars.isAiBusy,
+  );
+  const canRedo = useSelector(
+    (state: State) => state.frames._future.length > 0 && !state.sidebars.isAiBusy,
+  );
+  const isAiChatOpen = useSelector(
+    (state: State) => state.sidebars.isAiChatOpen,
+  );
 
   useEffect(() => {
     setCurrentTitle(presentationTitle);
@@ -48,6 +61,7 @@ const CanvasHeader = () => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (isAiBusy) return;
       const isMac = navigator.platform.toUpperCase().includes("MAC");
       const modifier = isMac ? e.metaKey : e.ctrlKey;
       if (modifier && e.key === "z" && !e.shiftKey) {
@@ -60,7 +74,7 @@ const CanvasHeader = () => {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [dispatch]);
+  }, [dispatch, isAiBusy]);
 
   const handleSave = async () => {
     await renamePresentation(presentationId, currentTitle);
@@ -151,6 +165,18 @@ const CanvasHeader = () => {
             </IconButton>
           </span>
         </Tooltip>
+        <Button
+          color="inherit"
+          startIcon={<AutoAwesome />}
+          onClick={() => dispatch(toggleAiChat())}
+          sx={{
+            mr: 1,
+            bgcolor: isAiChatOpen ? "rgba(255,255,255,0.18)" : "transparent",
+            "&:hover": { bgcolor: "rgba(255,255,255,0.25)" },
+          }}
+        >
+          Build with AI
+        </Button>
         <Button
           color="inherit"
           onClick={() => router.push("/")}

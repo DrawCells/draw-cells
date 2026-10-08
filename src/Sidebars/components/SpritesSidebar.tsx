@@ -84,11 +84,10 @@ export default function SpritesSidebar() {
   );
 
   const railWidth = parseInt(theme.spacing(6).replace("px", ""));
-  const headerHeight = theme.spacing(8);
+  // Fills #editor-workspace, which already sits below the header inside the card.
   const verticalStyles = {
     top: 0,
-    marginTop: headerHeight,
-    height: `calc(100vh - ${headerHeight})`,
+    height: "100%",
     background: "#fff",
     borderRight: "solid 1px #ddd",
   } as const;

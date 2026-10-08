@@ -17,6 +17,7 @@ const initialState: FramesState = {
   isFramesSaving: false,
   _past: [],
   _future: [],
+  _undoGroup: null,
 };
 
 interface Action {
@@ -55,6 +56,9 @@ export interface BaseSprite {
 export interface ImageSprite extends BaseSprite {
   kind?: "image";
   backgroundUrl?: string | undefined;
+  // Catalogue name, when known. Optional: sprites dragged from the sidebar and
+  // everything persisted before this field existed have only backgroundUrl.
+  name?: string;
 }
 
 // A text box rendered with a Konva Text node.
@@ -114,6 +118,9 @@ export interface FramesState {
   isFramesSaving?: boolean;
   _past: Array<FramesSnapshot>;
   _future: Array<FramesSnapshot>;
+  // Set while an undo group is open (see beginUndoGroup). `dirty` records
+  // whether the group has already saved its one snapshot.
+  _undoGroup?: { dirty: boolean } | null;
 }
 
 const computeNextFrame = (
@@ -496,6 +503,18 @@ export const frames = (
 ): FramesState => {
   const { type, payload } = action;
 
+  if (type === Actions.BEGIN_UNDO_GROUP) {
+    return { ...state, _undoGroup: { dirty: false } };
+  }
+
+  if (type === Actions.END_UNDO_GROUP) {
+    return state._undoGroup ? { ...state, _undoGroup: null } : state;
+  }
+
+  // An undo or redo inside an open group re-arms it, so the group's next
+  // change records a fresh snapshot instead of having no way back.
+  const rearmedGroup = state._undoGroup ? { dirty: false } : null;
+
   if (type === Actions.UNDO) {
     if (state._past.length === 0) return state;
     const previous = state._past[state._past.length - 1];
@@ -504,6 +523,7 @@ export const frames = (
       ...restoreSnapshot(state, previous),
       _past: newPast,
       _future: [snapshot(state), ...state._future],
+      _undoGroup: rearmedGroup,
     };
   }
 
@@ -515,6 +535,7 @@ export const frames = (
       ...restoreSnapshot(state, next),
       _past: [...state._past, snapshot(state)].slice(-MAX_HISTORY),
       _future: newFuture,
+      _undoGroup: rearmedGroup,
     };
   }
 
@@ -550,10 +571,6 @@ export const frames = (
   }
 
   const shouldTrack = TRACKED_ACTIONS.has(type);
-  const newPast = shouldTrack
-    ? [...state._past, snapshot(state)].slice(-MAX_HISTORY)
-    : state._past;
-  const newFuture = shouldTrack ? [] : state._future;
 
   const result = ((): FramesState => {
     switch (type) {
@@ -682,18 +699,40 @@ export const frames = (
       const toCopy = idSet(payload.ids);
       if (toCopy.size === 0) return state;
 
-      const spritesToCopy = state.currentFrame.sprites.filter((s) =>
-        toCopy.has(s.id.toString()),
+      const target = state.frames.find(
+        (f) => f.id?.toString() === payload.frameId?.toString(),
+      );
+      if (!target || target.id?.toString() === state.currentFrame.id?.toString()) {
+        return state;
+      }
+
+      // Skip sprites the target already holds: two sprites sharing an id in one
+      // frame would make the id-keyed motion pairing ambiguous.
+      const present = idSet(target.sprites.map((s) => s.id));
+      const spritesToCopy = state.currentFrame.sprites.filter(
+        (s) => toCopy.has(s.id.toString()) && !present.has(s.id.toString()),
       );
       if (spritesToCopy.length === 0) return state;
 
+      let newFrames = state.frames.map((f) =>
+        f === target
+          ? { ...f, sprites: [...f.sprites, ...structuredClone(spritesToCopy)] }
+          : f,
+      );
+      // The copy can land in a frame adjacent to any other, so recompute every
+      // frame's motion rather than only the target's neighbours — otherwise the
+      // sprites just copied into the next frame would not animate towards it.
+      for (const f of newFrames) {
+        newFrames = computeNewFrames(newFrames, f).frames;
+      }
       return {
         ...state,
-        frames: state.frames.map((f) =>
-          f.id?.toString() === payload.frameId?.toString()
-            ? { ...f, sprites: [...f.sprites, ...structuredClone(spritesToCopy)] }
-            : f,
-        ),
+        frames: newFrames,
+        currentFrame:
+          newFrames.find(
+            (f) => f.id?.toString() === state.currentFrame.id?.toString(),
+          ) ?? state.currentFrame,
+        nextFrame: computeNextFrame(newFrames, state.currentFrame),
       };
     }
     case Actions.ADD_FRAME: {
@@ -975,5 +1014,23 @@ export const frames = (
     }
   })();
 
-  return { ...result, _past: newPast, _future: newFuture };
+  // A tracked action whose case bailed out with `state` untouched (grouping
+  // fewer than two sprites, an empty id list) records no undo step — it would
+  // undo nothing. Cases that rebuild the frame regardless still record one.
+  const changed =
+    result.frames !== state.frames || result.currentFrame !== state.currentFrame;
+  if (!shouldTrack || !changed) return result;
+
+  // Inside an undo group only the first change saves a snapshot; the rest fold
+  // into it, so undo returns to the state from before the whole group.
+  const group = state._undoGroup;
+  const saveSnapshot = !group?.dirty;
+  return {
+    ...result,
+    _past: saveSnapshot
+      ? [...state._past, snapshot(state)].slice(-MAX_HISTORY)
+      : state._past,
+    _future: [],
+    _undoGroup: group ? { dirty: true } : group,
+  };
 };
