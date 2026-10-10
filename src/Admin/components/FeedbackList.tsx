@@ -35,6 +35,7 @@ import {
   FeedbackStatus,
   FeedbackType,
 } from "../../Feedback/types";
+import LocalDateTime from "./LocalDateTime";
 
 const TYPE_COLORS: Record<FeedbackType, "error" | "info" | "default"> = {
   bug: "error",
@@ -51,18 +52,6 @@ const STATUS_COLORS: Record<FeedbackStatus, "warning" | "info" | "success" | "de
 
 // "Open" hides finished items, which is what triage usually wants.
 type StatusFilter = "open" | "all" | FeedbackStatus;
-
-function formatDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 function StatusSelect({
   value,
@@ -263,7 +252,7 @@ export default function FeedbackList({ items: initialItems }: { items: FeedbackI
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2" noWrap>
-                    {formatDate(i.createdAt)}
+                    <LocalDateTime value={i.createdAt} />
                   </Typography>
                 </TableCell>
                 <TableCell>
@@ -351,7 +340,9 @@ export default function FeedbackList({ items: initialItems }: { items: FeedbackI
             </Stack>
 
             <Detail label="From">{selected.email}</Detail>
-            <Detail label="Received">{formatDate(selected.createdAt)}</Detail>
+            <Detail label="Received">
+              <LocalDateTime value={selected.createdAt} />
+            </Detail>
             <Detail label="Page">
               {selected.pageUrl && (
                 <Link href={selected.pageUrl} target="_blank" rel="noopener">
