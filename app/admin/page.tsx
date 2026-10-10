@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { getSessionUser, getAdminUser } from "../../lib/auth";
 import { supabaseAdmin } from "../../lib/supabaseAdmin";
 import UsersList, { AdminUser } from "../../src/Admin/components/UsersList";
+import AdminNav from "../../src/Admin/components/AdminNav";
 
 const PER_PAGE = 1000;
 
@@ -69,6 +70,7 @@ export default async function AdminPage() {
 
   return (
     <Suspense>
+      <AdminNav />
       <UsersList users={users} />
     </Suspense>
   );
