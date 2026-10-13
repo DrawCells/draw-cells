@@ -1,3 +1,10 @@
+-- Baseline: the schema as it stood in supabase/schema.sql when the project
+-- moved to migrations (commit 892c666). Staging and prod already have it, so
+-- it is NOT pushed to them — mark it applied instead:
+--   supabase migration repair 20261009120000 --status applied
+-- A fresh database (local dev, a new project) gets it via `supabase db push`
+-- or `supabase db reset` like any other migration.
+--
 -- Supabase schema for the Firebase -> Supabase migration (data + auth together).
 -- Run in the Supabase SQL editor, or with `supabase db push`.
 --

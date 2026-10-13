@@ -23,6 +23,7 @@ import { updatePresentationTitle, undo, redo } from "../../Frames/actions";
 import { toggleModal } from "../../Presentation/actions";
 import State from "../../stateInterface";
 import ExportVideo from "./ExportVideo";
+import FeedbackButton from "../../Feedback/components/FeedbackButton";
 
 // interface HeaderProps {
 // }
@@ -179,6 +180,7 @@ const CanvasHeader = () => {
         >
           Get presentation link
         </Button>
+        <FeedbackButton compact />
         <ExportVideo presentationId={presentationId} />
       </Toolbar>
     </AppBar>

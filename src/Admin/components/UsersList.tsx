@@ -16,6 +16,7 @@ import {
   Typography,
 } from "@mui/material";
 import React, { useMemo, useState } from "react";
+import LocalDateTime from "./LocalDateTime";
 
 export interface AdminUser {
   uid: string;
@@ -31,19 +32,6 @@ export interface AdminUser {
 
 interface UsersListProps {
   users: AdminUser[];
-}
-
-function formatDate(value: string | null): string {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }
 
 // Timestamps arrive as ISO 8601 strings; parse for sorting, treating
@@ -160,12 +148,12 @@ export default function UsersList({ users }: UsersListProps) {
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2">
-                    {formatDate(u.creationTime)}
+                    <LocalDateTime value={u.creationTime} />
                   </Typography>
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2">
-                    {formatDate(u.lastSignInTime)}
+                    <LocalDateTime value={u.lastSignInTime} />
                   </Typography>
                 </TableCell>
                 <TableCell>
