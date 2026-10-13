@@ -18,7 +18,7 @@ export async function GET(
   const { id } = await params;
   const { data, error } = await supabaseAdmin
     .from("presentations")
-    .select("id, title, frames")
+    .select("id, title, frames, canvas_width, canvas_height")
     .eq("id", id)
     .single();
 
@@ -30,5 +30,7 @@ export async function GET(
     id: data.id,
     title: data.title,
     frames: data.frames ?? [],
+    canvasWidth: data.canvas_width,
+    canvasHeight: data.canvas_height,
   });
 }

@@ -5,7 +5,6 @@ import ExportProgressDialog, {
 } from "./ExportProgressDialog";
 import { useSelector } from "react-redux";
 import State from "../../stateInterface";
-import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH } from "../../constants";
 import { Sprite } from "../../Frames/reducers/frames";
 import Konva from "konva";
 import ArrowDropDown from "@mui/icons-material/ArrowDropDown";
@@ -114,6 +113,9 @@ export default function ExportVideo({
 
   const frames = useSelector((state: State) => state.frames.frames);
   const currentFrame = useSelector((state: State) => state.frames.currentFrame);
+  const canvasWidth = useSelector((state: State) => state.canvas.width);
+  const canvasHeight = useSelector((state: State) => state.canvas.height);
+  const canvasSize = { width: canvasWidth, height: canvasHeight };
 
   const createStage = () => {
     const container = document.createElement("div");
@@ -123,8 +125,8 @@ export default function ExportVideo({
 
     const stage = new Konva.Stage({
       container: container,
-      width: VIEWPORT_WIDTH,
-      height: VIEWPORT_HEIGHT,
+      width: canvasWidth,
+      height: canvasHeight,
       stroke: "#eaeaea",
       strokeWidth: 1,
       fillPatternRepeat: "no-repeat",
@@ -143,7 +145,7 @@ export default function ExportVideo({
     const layer = new Konva.Layer();
     stage.add(layer);
 
-    await addBackgroundToLayer(layer, backgroundUrl);
+    await addBackgroundToLayer(layer, canvasSize, backgroundUrl);
     await addSpritesToLayer(layer, sprites);
 
     stage.draw();
@@ -404,6 +406,7 @@ export default function ExportVideo({
     try {
       const dataUrl = await renderFrameToDataUrl(
         currentFrame.sprites,
+        canvasSize,
         currentFrame.backgroundUrl,
       );
       const link = document.createElement("a");
@@ -423,15 +426,16 @@ export default function ExportVideo({
     try {
       const dataUrl = await renderFrameToDataUrl(
         currentFrame.sprites,
+        canvasSize,
         currentFrame.backgroundUrl,
       );
       const pdf = new jsPDF({
         orientation:
-          VIEWPORT_WIDTH >= VIEWPORT_HEIGHT ? "landscape" : "portrait",
+          canvasWidth >= canvasHeight ? "landscape" : "portrait",
         unit: "px",
-        format: [VIEWPORT_WIDTH, VIEWPORT_HEIGHT],
+        format: [canvasWidth, canvasHeight],
       });
-      pdf.addImage(dataUrl, "PNG", 0, 0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
+      pdf.addImage(dataUrl, "PNG", 0, 0, canvasWidth, canvasHeight);
       pdf.save("frame.pdf");
     } finally {
       setIsExporting(false);

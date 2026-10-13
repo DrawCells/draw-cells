@@ -5,15 +5,14 @@ import { useDispatch, useSelector } from "react-redux";
 import State from "../../stateInterface";
 import { setCurrentFrameBackground } from "../../Frames/actions";
 import { loadBackgrounds } from "../actions";
-import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH } from "../../constants";
 
 const SCROLL_ID = "backgrounds-scroll";
 
 // Tiles use the viewport's aspect ratio (backgrounds are stretched to fill it),
 // so each tile previews the result and has a fixed height before its image loads.
-const tileSx = (selected: boolean) => ({
+const tileSx = (selected: boolean, aspectRatio: string) => ({
   width: "100%",
-  aspectRatio: `${VIEWPORT_WIDTH} / ${VIEWPORT_HEIGHT}`,
+  aspectRatio,
   borderRadius: 1,
   overflow: "hidden",
   cursor: "pointer",
@@ -25,6 +24,9 @@ const tileSx = (selected: boolean) => ({
 function BackgroundsSection({ active }: { active: boolean }) {
   const dispatch = useDispatch();
   const backgrounds = useSelector((state: State) => state.sidebars.backgrounds);
+  const canvasWidth = useSelector((state: State) => state.canvas.width);
+  const canvasHeight = useSelector((state: State) => state.canvas.height);
+  const aspectRatio = `${canvasWidth} / ${canvasHeight}`;
   const currentBackground = useSelector(
     (state: State) => state.frames.currentFrame.backgroundUrl,
   );
@@ -104,7 +106,7 @@ function BackgroundsSection({ active }: { active: boolean }) {
           <Box
             onClick={() => handleFrameBackground(undefined)}
             sx={{
-              ...tileSx(!currentBackground),
+              ...tileSx(!currentBackground, aspectRatio),
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -121,7 +123,7 @@ function BackgroundsSection({ active }: { active: boolean }) {
             <Box
               key={bg.path}
               onClick={() => handleFrameBackground(bg.path)}
-              sx={tileSx(currentBackground === bg.path)}
+              sx={tileSx(currentBackground === bg.path, aspectRatio)}
             >
               <img
                 src={bg.thumbUrl || bg.url}

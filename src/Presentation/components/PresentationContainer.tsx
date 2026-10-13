@@ -4,7 +4,6 @@ import { Button } from "@mui/material";
 import React, { useEffect, useState } from "react";
 import { Image as KonvaImage, Layer, Stage } from "react-konva";
 import { useDispatch, useSelector } from "react-redux";
-import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH } from "../../constants";
 import {
   loadInitialData,
   nextAnimationFrame,
@@ -20,11 +19,6 @@ import AnimationSprite from "../../Sprites/AnimationSprite";
 import { loadSpriteImage } from "../../helpers";
 import State from "../../stateInterface";
 
-const SCALE = Math.min(
-  (window.innerWidth - 250) / VIEWPORT_WIDTH,
-  (window.innerHeight - 200) / VIEWPORT_HEIGHT
-);
-
 const PresentationContainer = ({
   presentationId,
 }: {
@@ -33,6 +27,13 @@ const PresentationContainer = ({
   const frames = useSelector((state: State) => state.frames.frames);
   const currentFrame = useSelector((state: State) => state.frames.currentFrame);
   const prevFrame = useSelector((state: State) => state.frames.prevFrame);
+  const canvasWidth = useSelector((state: State) => state.canvas.width);
+  const canvasHeight = useSelector((state: State) => state.canvas.height);
+
+  const SCALE = Math.min(
+    (window.innerWidth - 250) / canvasWidth,
+    (window.innerHeight - 200) / canvasHeight
+  );
 
   // Sprites animate between two frames, and which of the pair comes first in
   // the presentation is what decides whether the step plays forward or in
@@ -88,14 +89,14 @@ const PresentationContainer = ({
         style={{
           padding: "10px 50px 20px",
           backgroundColor: "white",
-          width: VIEWPORT_WIDTH * SCALE,
-          height: VIEWPORT_HEIGHT * SCALE,
+          width: canvasWidth * SCALE,
+          height: canvasHeight * SCALE,
         }}
       >
         <Stage
           scale={{ x: SCALE, y: SCALE }}
-          width={VIEWPORT_WIDTH * SCALE}
-          height={VIEWPORT_HEIGHT * SCALE}
+          width={canvasWidth * SCALE}
+          height={canvasHeight * SCALE}
           style={{
             border: "solid 1px #ddd",
             marginBottom: 20,
@@ -106,8 +107,8 @@ const PresentationContainer = ({
             {backgroundImage && (
               <KonvaImage
                 image={backgroundImage}
-                width={VIEWPORT_WIDTH}
-                height={VIEWPORT_HEIGHT}
+                width={canvasWidth}
+                height={canvasHeight}
                 listening={false}
               />
             )}
@@ -152,7 +153,7 @@ const PresentationContainer = ({
         style={{
           display: "flex",
           justifyContent: "space-around",
-          width: VIEWPORT_WIDTH,
+          width: canvasWidth,
         }}
       >
         <Button

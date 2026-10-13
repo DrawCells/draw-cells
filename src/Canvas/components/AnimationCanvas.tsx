@@ -7,10 +7,10 @@ import { HTML5Backend } from "react-dnd-html5-backend";
 import { Layer, Rect, Stage, Transformer } from "react-konva";
 import { useDispatch, useSelector } from "react-redux";
 import {
+  DEFAULT_CANVAS_HEIGHT,
+  DEFAULT_CANVAS_WIDTH,
   leftDrawerWidth,
   OFFSET,
-  VIEWPORT_HEIGHT,
-  VIEWPORT_WIDTH,
 } from "../../constants";
 import {
   addCurrentSprite,
@@ -81,6 +81,8 @@ function AnimationCanvas() {
     (state: State) => state.sidebars.isSpritesOpen,
   );
   const scale = useSelector((state: State) => state.canvas.scale);
+  const canvasWidth = useSelector((state: State) => state.canvas.width);
+  const canvasHeight = useSelector((state: State) => state.canvas.height);
   const canvasContainer = useRef<any>(null);
   const dndContainerRef = useRef<any>(null);
 
@@ -123,13 +125,17 @@ function AnimationCanvas() {
       hasLoadedRef.current = true;
       setIsLoading(false);
 
+      // Read the size from the response: the store's copy isn't visible to
+      // this closure until the next render.
+      const loadedWidth = data?.canvasWidth || DEFAULT_CANVAS_WIDTH;
+      const loadedHeight = data?.canvasHeight || DEFAULT_CANVAS_HEIGHT;
       const scrollX =
-        (VIEWPORT_WIDTH * 2 +
+        (loadedWidth * 2 +
           OFFSET * 2 -
           (window.innerWidth - smallDrawerWidth * 2)) /
         2;
       const scrollY =
-        (VIEWPORT_HEIGHT * 2 +
+        (loadedHeight * 2 +
           OFFSET * 2 -
           (window.innerHeight - smallDrawerWidth - headerHeight)) /
         2;
@@ -177,14 +183,14 @@ function AnimationCanvas() {
       if (cancelled || !img) return;
       viewportRef.current.fillPatternImage(img);
       viewportRef.current.fillPatternScale({
-        x: VIEWPORT_WIDTH / img.width,
-        y: VIEWPORT_HEIGHT / img.height,
+        x: canvasWidth / img.width,
+        y: canvasHeight / img.height,
       });
     });
     return () => {
       cancelled = true;
     };
-  }, [currentFrameBgUrl]);
+  }, [currentFrameBgUrl, canvasWidth, canvasHeight]);
 
   // SAVE FRAME PREVIEW
   useEffect(() => {
@@ -198,6 +204,7 @@ function AnimationCanvas() {
       console.log("Rendering frame to data URL");
       const dataUrl = await renderFrameToDataUrl(
         sprites,
+        { width: canvasWidth, height: canvasHeight },
         currentFrameBgUrl,
       );
       console.log("Data URL generated, dispatching setFramePreview");
@@ -212,12 +219,14 @@ function AnimationCanvas() {
     sprites,
     currentFrameId,
     currentFrameBgUrl,
+    canvasWidth,
+    canvasHeight,
     isAnimationPreviewModalOpen,
     dispatch,
   ]);
 
   // STYLING
-  const canvasWidth = `calc(100vw - ${
+  const containerWidth = `calc(100vw - ${
     smallDrawerWidth +
     (isSpritesSidebarOpen ? leftDrawerWidth : smallDrawerWidth)
   }px)`;
@@ -229,15 +238,15 @@ function AnimationCanvas() {
     flexDirection: "column",
     marginLeft: isSpritesSidebarOpen ? leftDrawerWidth : smallDrawerWidth,
     marginRight: smallDrawerWidth,
-    width: canvasWidth,
+    width: containerWidth,
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
   };
 
   const largeContainerStyle = {
-    width: 2 * VIEWPORT_WIDTH + 2 * OFFSET,
-    height: 2 * VIEWPORT_HEIGHT + 2 * OFFSET,
+    width: 2 * canvasWidth + 2 * OFFSET,
+    height: 2 * canvasHeight + 2 * OFFSET,
     overflow: "hidden",
     backgroundColor: "#f0f0f0",
   };
@@ -614,8 +623,8 @@ function AnimationCanvas() {
             >
               <React.Suspense>
                 <Stage
-                  width={2 * VIEWPORT_WIDTH + 2 * OFFSET}
-                  height={2 * VIEWPORT_HEIGHT + 2 * OFFSET}
+                  width={2 * canvasWidth + 2 * OFFSET}
+                  height={2 * canvasHeight + 2 * OFFSET}
                   ref={stageRef}
                   onClick={(e: any) => {
                     if (didDragSelect.current) {
@@ -636,8 +645,8 @@ function AnimationCanvas() {
                   scale={{ x: scale, y: scale }}
                   x={stagePosition.x}
                   y={stagePosition.y}
-                  offsetX={-(VIEWPORT_WIDTH / 2 + OFFSET) * (1 / scale)}
-                  offsetY={-(VIEWPORT_HEIGHT / 2 + OFFSET) * (1 / scale)}
+                  offsetX={-(canvasWidth / 2 + OFFSET) * (1 / scale)}
+                  offsetY={-(canvasHeight / 2 + OFFSET) * (1 / scale)}
                   // style={{backgroundColor: 'white'}}
                 >
                   <Layer>
@@ -647,8 +656,8 @@ function AnimationCanvas() {
                       y={0}
                       stroke={"#eaeaea"}
                       strokeWidth={1}
-                      width={VIEWPORT_WIDTH}
-                      height={VIEWPORT_HEIGHT}
+                      width={canvasWidth}
+                      height={canvasHeight}
                       shadowColor="#555"
                       shadowBlur={90}
                       shadowOffset={{ x: 10, y: 10 }}
