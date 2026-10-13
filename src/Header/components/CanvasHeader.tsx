@@ -25,6 +25,7 @@ import { toggleModal } from "../../Presentation/actions";
 import { toggleAiChat } from "../../Sidebars/actions";
 import State from "../../stateInterface";
 import ExportVideo from "./ExportVideo";
+import FeedbackButton from "../../Feedback/components/FeedbackButton";
 
 // interface HeaderProps {
 // }
@@ -202,6 +203,7 @@ const CanvasHeader = () => {
         >
           Get presentation link
         </Button>
+        <FeedbackButton compact />
         <ExportVideo presentationId={presentationId} />
       </Toolbar>
     </AppBar>

@@ -10,6 +10,7 @@ import { setUser } from "../../Home/reducers";
 import { createNewPresentation } from "../actions";
 import { logoutAction } from "../../../app/login/actions";
 import { useRouter } from "next/navigation";
+import FeedbackButton from "../../Feedback/components/FeedbackButton";
 
 const HomeHeader = () => {
   const dispatch = useDispatch();
@@ -80,6 +81,7 @@ const HomeHeader = () => {
         )}
         {user && (
           <>
+            <FeedbackButton />
             <Button
               onClick={(e: any) => setAnchorEl(e.currentTarget)}
               sx={{ color: "white" }}
