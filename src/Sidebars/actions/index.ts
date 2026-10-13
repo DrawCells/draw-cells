@@ -29,7 +29,7 @@ export const toggleProperties = () => ({
 
 export const loadBackgrounds = (payload: {
   backgrounds: Array<any>;
-  hasEnded?: boolean;
+  nextPageToken: string | null;
 }) => ({
   type: Actions.LOAD_BACKGROUNDS,
   payload,

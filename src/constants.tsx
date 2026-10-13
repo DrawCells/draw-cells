@@ -5,8 +5,30 @@ export const bottomDrawerHeight = 240;
 export const leftDrawerWidth = 300;
 
 export const OFFSET = 200;
-export const VIEWPORT_WIDTH = 810;
-export const VIEWPORT_HEIGHT = 540;
+// Default canvas size, used by presentations that predate per-presentation
+// sizes. The live size is in state.canvas (canvasWidth / canvasHeight).
+export const DEFAULT_CANVAS_WIDTH = 810;
+export const DEFAULT_CANVAS_HEIGHT = 540;
+// Kept in sync with the check constraints on presentations.canvas_width/height.
+export const CANVAS_MIN_SIZE = 100;
+export const CANVAS_MAX_SIZE = 2000;
+
+export interface CanvasSizePreset {
+  label: string;
+  width: number;
+  height: number;
+}
+
+export const CANVAS_SIZE_PRESETS: CanvasSizePreset[] = [
+  { label: "Default (3:2)", width: 810, height: 540 },
+  { label: "Widescreen (16:9)", width: 960, height: 540 },
+  { label: "Standard (4:3)", width: 720, height: 540 },
+  { label: "Square (1:1)", width: 600, height: 600 },
+  { label: "Portrait (4:5)", width: 540, height: 675 },
+  { label: "Story (9:16)", width: 540, height: 960 },
+  { label: "A4 landscape", width: 842, height: 595 },
+  { label: "A4 portrait", width: 595, height: 842 },
+];
 
 export const SPRITES_BY_CATEGORY_TO_SVG_ELEMENT_MAP = {
   "Brain": {
