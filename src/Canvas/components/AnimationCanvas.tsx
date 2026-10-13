@@ -167,7 +167,11 @@ function AnimationCanvas() {
 
   // Get bg from db
   useEffect(() => {
-    if (!currentFrameBgUrl) return;
+    if (!currentFrameBgUrl) {
+      // Drop the previous frame's image so it can't linger under the white fill.
+      viewportRef.current?.fillPatternImage(null);
+      return;
+    }
     let cancelled = false;
     loadSpriteImage(currentFrameBgUrl).then((img) => {
       if (cancelled || !img) return;
@@ -192,7 +196,10 @@ function AnimationCanvas() {
       console.log("Debounced preview save triggered");
       if (!currentFrameId) return;
       console.log("Rendering frame to data URL");
-      const dataUrl = await renderFrameToDataUrl(sprites);
+      const dataUrl = await renderFrameToDataUrl(
+        sprites,
+        currentFrameBgUrl,
+      );
       console.log("Data URL generated, dispatching setFramePreview");
       if (!cancelled) dispatch(setFramePreview(currentFrameId, dataUrl));
     }, 200);
@@ -201,7 +208,13 @@ function AnimationCanvas() {
       clearTimeout(t);
       cancelled = true;
     };
-  }, [sprites, currentFrameId, isAnimationPreviewModalOpen, dispatch]);
+  }, [
+    sprites,
+    currentFrameId,
+    currentFrameBgUrl,
+    isAnimationPreviewModalOpen,
+    dispatch,
+  ]);
 
   // STYLING
   const canvasWidth = `calc(100vw - ${

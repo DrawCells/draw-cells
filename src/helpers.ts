@@ -143,7 +143,27 @@ export async function addSpritesToLayer(
   }
 }
 
-export async function renderFrameToDataUrl(sprites: Sprite[]): Promise<string> {
+// Adds the frame's backdrop to the layer: white, with the frame's background
+// image (if any) stretched over the viewport, matching the editing canvas.
+export async function addBackgroundToLayer(
+  layer: Konva.Layer,
+  backgroundUrl?: string,
+): Promise<void> {
+  layer.add(
+    new Konva.Rect({ x: 0, y: 0, width: VIEWPORT_WIDTH, height: VIEWPORT_HEIGHT, fill: "white" }),
+  );
+  const img = await loadSpriteImage(backgroundUrl || "");
+  if (img) {
+    layer.add(
+      new Konva.Image({ x: 0, y: 0, image: img, width: VIEWPORT_WIDTH, height: VIEWPORT_HEIGHT }),
+    );
+  }
+}
+
+export async function renderFrameToDataUrl(
+  sprites: Sprite[],
+  backgroundUrl?: string,
+): Promise<string> {
   const container = document.createElement("div");
   container.style.position = "fixed";
   container.style.left = "-9999px";
@@ -153,10 +173,7 @@ export async function renderFrameToDataUrl(sprites: Sprite[]): Promise<string> {
   const layer = new Konva.Layer();
   stage.add(layer);
 
-  const background = new Konva.Rect({ x: 0, y: 0, width: VIEWPORT_WIDTH, height: VIEWPORT_HEIGHT, fill: "white" });
-  layer.add(background);
-  background.moveToBottom();
-
+  await addBackgroundToLayer(layer, backgroundUrl);
   await addSpritesToLayer(layer, sprites);
 
   stage.draw();

@@ -181,7 +181,8 @@ export const recomputeFrames = () => ({
   type: Actions.RECOMPUTE_FRAMES,
 });
 
-export const setCurrentFrameBackground = (background: string) => ({
+// Pass undefined to remove the current frame's background.
+export const setCurrentFrameBackground = (background: string | undefined) => ({
   type: Actions.SET_CURRENT_FRAME_BACKGROUND,
   payload: background,
 });

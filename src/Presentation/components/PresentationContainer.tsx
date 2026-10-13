@@ -1,8 +1,8 @@
 "use client";
 
 import { Button } from "@mui/material";
-import React, { useEffect } from "react";
-import { Layer, Stage } from "react-konva";
+import React, { useEffect, useState } from "react";
+import { Image as KonvaImage, Layer, Stage } from "react-konva";
 import { useDispatch, useSelector } from "react-redux";
 import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH } from "../../constants";
 import {
@@ -17,6 +17,7 @@ import {
   Sprite,
 } from "../../Frames/reducers/frames";
 import AnimationSprite from "../../Sprites/AnimationSprite";
+import { loadSpriteImage } from "../../helpers";
 import State from "../../stateInterface";
 
 const SCALE = Math.min(
@@ -49,6 +50,18 @@ const PresentationContainer = ({
       .map((s) => ({ ...s, opacity: 0 })) || [];
 
   const dispatch = useDispatch();
+
+  const [backgroundImage, setBackgroundImage] =
+    useState<HTMLImageElement | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    loadSpriteImage(currentFrame.backgroundUrl || "").then((img) => {
+      if (!cancelled) setBackgroundImage(img);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentFrame.backgroundUrl]);
 
   useEffect(() => {
     if (!presentationId) {
@@ -90,6 +103,14 @@ const PresentationContainer = ({
           }}
         >
           <Layer>
+            {backgroundImage && (
+              <KonvaImage
+                image={backgroundImage}
+                width={VIEWPORT_WIDTH}
+                height={VIEWPORT_HEIGHT}
+                listening={false}
+              />
+            )}
             {currentFrame.sprites
               .concat(...spritesToRemove)
               .map((s: Sprite) => (

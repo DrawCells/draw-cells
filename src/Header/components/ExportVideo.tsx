@@ -10,7 +10,11 @@ import { Sprite } from "../../Frames/reducers/frames";
 import Konva from "konva";
 import ArrowDropDown from "@mui/icons-material/ArrowDropDown";
 import { jsPDF } from "jspdf";
-import { addSpritesToLayer, renderFrameToDataUrl } from "../../helpers";
+import {
+  addBackgroundToLayer,
+  addSpritesToLayer,
+  renderFrameToDataUrl,
+} from "../../helpers";
 
 // Frames are rendered, presigned, and uploaded one chunk at a time. This caps
 // how many frame blobs live in memory at once, keeps S3 PUTs within the signed
@@ -28,6 +32,7 @@ interface PresignedItem {
 interface FrameSpec {
   filename: string;
   sprites: Sprite[];
+  backgroundUrl?: string;
 }
 
 // Runs `worker` over `items` with at most `concurrency` in flight at a time,
@@ -129,20 +134,16 @@ export default function ExportVideo({
     return stage;
   };
 
-  const renderSprites = async (stage: Konva.Stage, sprites: Sprite[]) => {
+  const renderSprites = async (
+    stage: Konva.Stage,
+    sprites: Sprite[],
+    backgroundUrl?: string,
+  ) => {
     stage.destroyChildren();
     const layer = new Konva.Layer();
     stage.add(layer);
-    const background = new Konva.Rect({
-      x: 0,
-      y: 0,
-      width: VIEWPORT_WIDTH,
-      height: VIEWPORT_HEIGHT,
-      fill: "white",
-    });
-    layer.add(background);
-    background.moveToBottom();
 
+    await addBackgroundToLayer(layer, backgroundUrl);
     await addSpritesToLayer(layer, sprites);
 
     stage.draw();
@@ -298,7 +299,11 @@ export default function ExportVideo({
         const filename = `frame-${String(frameIdx).padStart(4, "0")}-${String(
           i,
         ).padStart(4, "0")}.png`;
-        frameSpecs.push({ filename, sprites: newSprites });
+        frameSpecs.push({
+          filename,
+          sprites: newSprites,
+          backgroundUrl: frame.backgroundUrl,
+        });
       }
     }
 
@@ -314,7 +319,9 @@ export default function ExportVideo({
         // Rendering shares one Konva stage, so it must stay sequential.
         const blobs: Blob[] = [];
         for (const spec of chunk) {
-          blobs.push(await renderSprites(stage, spec.sprites));
+          blobs.push(
+            await renderSprites(stage, spec.sprites, spec.backgroundUrl),
+          );
         }
 
         const presigned = await presignBatch(
@@ -395,7 +402,10 @@ export default function ExportVideo({
     setIsExporting(true);
     setAnchorEl(null);
     try {
-      const dataUrl = await renderFrameToDataUrl(currentFrame.sprites);
+      const dataUrl = await renderFrameToDataUrl(
+        currentFrame.sprites,
+        currentFrame.backgroundUrl,
+      );
       const link = document.createElement("a");
       link.href = dataUrl;
       link.download = "frame.png";
@@ -411,7 +421,10 @@ export default function ExportVideo({
     setIsExporting(true);
     setAnchorEl(null);
     try {
-      const dataUrl = await renderFrameToDataUrl(currentFrame.sprites);
+      const dataUrl = await renderFrameToDataUrl(
+        currentFrame.sprites,
+        currentFrame.backgroundUrl,
+      );
       const pdf = new jsPDF({
         orientation:
           VIEWPORT_WIDTH >= VIEWPORT_HEIGHT ? "landscape" : "portrait",
