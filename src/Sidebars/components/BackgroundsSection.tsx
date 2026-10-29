@@ -1,104 +1,162 @@
-import { Box, CircularProgress, Typography } from "@mui/material";
+import { Box, Button, CircularProgress, Typography } from "@mui/material";
 import InfiniteScroll from "react-infinite-scroll-component";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import State from "../../stateInterface";
 import { setCurrentFrameBackground } from "../../Frames/actions";
 import { loadBackgrounds } from "../actions";
 
+const SCROLL_ID = "backgrounds-scroll";
+
+// Tiles use the viewport's aspect ratio (backgrounds are stretched to fill it),
+// so each tile previews the result and has a fixed height before its image loads.
+const tileSx = (selected: boolean, aspectRatio: string) => ({
+  width: "100%",
+  aspectRatio,
+  borderRadius: 1,
+  overflow: "hidden",
+  cursor: "pointer",
+  outline: "2px solid",
+  outlineColor: selected ? "primary.main" : "transparent",
+  outlineOffset: 2,
+});
+
 function BackgroundsSection({ active }: { active: boolean }) {
   const dispatch = useDispatch();
   const backgrounds = useSelector((state: State) => state.sidebars.backgrounds);
+  const canvasWidth = useSelector((state: State) => state.canvas.width);
+  const canvasHeight = useSelector((state: State) => state.canvas.height);
+  const aspectRatio = `${canvasWidth} / ${canvasHeight}`;
+  const currentBackground = useSelector(
+    (state: State) => state.frames.currentFrame.backgroundUrl,
+  );
 
-  const pageTokens = useRef<(string | undefined)[]>([]);
-  const hasLoadedOnceRef = useRef(false);
-  const [page, setPage] = useState<number>(0);
+  const inFlightRef = useRef(false);
+  const [error, setError] = useState(false);
 
-  useEffect(() => {
-    if (
-      !active ||
-      backgrounds.hasEnded ||
-      (hasLoadedOnceRef.current && page === 0)
-    )
-      return;
-
-    const getBg = async () => {
-      if (page === 0) {
-        hasLoadedOnceRef.current = true;
-      }
-      const currentToken = pageTokens.current?.shift();
+  const loadMore = useCallback(async () => {
+    if (inFlightRef.current || backgrounds.hasEnded) return;
+    inFlightRef.current = true;
+    setError(false);
+    try {
       const params = new URLSearchParams({
-        prefix: "backgrounds",
+        prefix: "backgrounds/",
         maxResults: "20",
       });
-      if (currentToken) params.set("pageToken", currentToken);
+      if (backgrounds.nextPageToken) {
+        params.set("pageToken", backgrounds.nextPageToken);
+      }
 
       const res = await fetch(`/api/storage?${params}`);
+      if (!res.ok) throw new Error(`Listing backgrounds failed: ${res.status}`);
       const data = await res.json();
 
-      pageTokens.current?.push(data.nextPageToken);
       dispatch(
         loadBackgrounds({
           backgrounds: data.files || [],
-          hasEnded: !data.nextPageToken,
+          nextPageToken: data.nextPageToken ?? null,
         }),
       );
-    };
+    } catch (err) {
+      console.error(err);
+      setError(true);
+    } finally {
+      inFlightRef.current = false;
+    }
+  }, [dispatch, backgrounds.hasEnded, backgrounds.nextPageToken]);
 
-    getBg();
-  }, [active, dispatch, page, backgrounds.hasEnded]);
+  // InfiniteScroll only asks for more on scroll, so load while the panel is
+  // open and the list is too short to scroll: the first page, plus more on tall
+  // screens. A remounted sidebar resumes from the stored page token.
+  useEffect(() => {
+    if (!active || error || backgrounds.hasEnded) return;
+    const el = document.getElementById(SCROLL_ID);
+    if (el && el.scrollHeight <= el.clientHeight) loadMore();
+  }, [active, error, backgrounds.hasEnded, backgrounds.list.length, loadMore]);
 
-  const handleNext = () => {
-    setPage(page + 1);
-  };
-
-  const handleFrameBackground = (path: string) => {
+  const handleFrameBackground = (path: string | undefined) => {
     dispatch(setCurrentFrameBackground(path));
   };
 
   return (
-    <Box id="backgrounds-scroll" sx={{ height: "100%", overflowY: "auto" }}>
+    <Box id={SCROLL_ID} sx={{ height: "100%", overflowY: "auto" }}>
       <Typography variant="subtitle2" sx={{ px: 2, pt: 1.5, pb: 1 }}>
         Background Images
       </Typography>
       <InfiniteScroll
         dataLength={backgrounds.list.length}
-        next={handleNext}
-        hasMore={!backgrounds?.hasEnded}
+        next={loadMore}
+        hasMore={!backgrounds.hasEnded && !error}
         loader={
           <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}>
             <CircularProgress size={24} />
           </Box>
         }
-        scrollableTarget="backgrounds-scroll"
+        scrollableTarget={SCROLL_ID}
       >
         <Box
           sx={{
-            width: "100%",
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
-            alignItems: "center",
-            justifyContent: "center",
             gap: 2,
-            px: 1,
+            px: 2,
+            py: 1,
           }}
         >
-          {backgrounds?.list?.map((bg: any, index: number) => (
-            <div
-              key={`bg-image-${index}`}
+          <Box
+            onClick={() => handleFrameBackground(undefined)}
+            sx={{
+              ...tileSx(!currentBackground, aspectRatio),
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              border: "1px dashed",
+              borderColor: "divider",
+              bgcolor: "#fff",
+            }}
+          >
+            <Typography variant="caption" color="text.secondary">
+              None
+            </Typography>
+          </Box>
+          {backgrounds.list.map((bg: any) => (
+            <Box
+              key={bg.path}
               onClick={() => handleFrameBackground(bg.path)}
-              style={{
-                width: "100%",
-                display: "flex",
-                justifyContent: "center",
-                cursor: "pointer",
-              }}
+              sx={tileSx(currentBackground === bg.path, aspectRatio)}
             >
-              <img src={bg.url} alt={bg.path} style={{ width: "90%" }} />
-            </div>
+              <img
+                src={bg.thumbUrl || bg.url}
+                alt={bg.path}
+                loading="lazy"
+                decoding="async"
+                // No thumbnail generated yet: fall back to the full image.
+                onError={(e) => {
+                  if (e.currentTarget.src !== bg.url) {
+                    e.currentTarget.src = bg.url;
+                  }
+                }}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "fill",
+                  display: "block",
+                }}
+              />
+            </Box>
           ))}
         </Box>
       </InfiniteScroll>
+      {error && (
+        <Box sx={{ textAlign: "center", py: 2 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            Couldn&apos;t load backgrounds.
+          </Typography>
+          <Button size="small" variant="outlined" onClick={loadMore}>
+            Retry
+          </Button>
+        </Box>
+      )}
     </Box>
   );
 }
