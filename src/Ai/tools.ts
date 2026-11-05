@@ -174,11 +174,11 @@ export const AI_TOOLS = [
         },
         x: {
           type: "number",
-          description: "Centre X on the canvas. The canvas is 810 wide.",
+          description: "Centre X on the canvas, between 0 and the canvas width.",
         },
         y: {
           type: "number",
-          description: "Centre Y on the canvas. The canvas is 540 tall.",
+          description: "Centre Y on the canvas, between 0 and the canvas height.",
         },
         size: {
           type: "number",

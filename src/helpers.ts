@@ -1,5 +1,4 @@
 import Konva from "konva";
-import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH } from "./constants";
 import { isArrowSprite, isTextSprite, Sprite } from "./Frames/reducers/frames";
 
 // Generates a globally-unique, opaque id for sprites and frames. Using a UUID
@@ -143,20 +142,41 @@ export async function addSpritesToLayer(
   }
 }
 
-export async function renderFrameToDataUrl(sprites: Sprite[]): Promise<string> {
+// Adds the frame's backdrop to the layer: white, with the frame's background
+// image (if any) stretched over the viewport, matching the editing canvas.
+export async function addBackgroundToLayer(
+  layer: Konva.Layer,
+  size: CanvasSize,
+  backgroundUrl?: string,
+): Promise<void> {
+  const { width, height } = size;
+  layer.add(new Konva.Rect({ x: 0, y: 0, width, height, fill: "white" }));
+  const img = await loadSpriteImage(backgroundUrl || "");
+  if (img) {
+    layer.add(new Konva.Image({ x: 0, y: 0, image: img, width, height }));
+  }
+}
+
+export interface CanvasSize {
+  width: number;
+  height: number;
+}
+
+export async function renderFrameToDataUrl(
+  sprites: Sprite[],
+  size: CanvasSize,
+  backgroundUrl?: string,
+): Promise<string> {
   const container = document.createElement("div");
   container.style.position = "fixed";
   container.style.left = "-9999px";
   container.style.top = "-9999px";
   document.body.appendChild(container);
-  const stage = new Konva.Stage({ container, width: VIEWPORT_WIDTH, height: VIEWPORT_HEIGHT });
+  const stage = new Konva.Stage({ container, width: size.width, height: size.height });
   const layer = new Konva.Layer();
   stage.add(layer);
 
-  const background = new Konva.Rect({ x: 0, y: 0, width: VIEWPORT_WIDTH, height: VIEWPORT_HEIGHT, fill: "white" });
-  layer.add(background);
-  background.moveToBottom();
-
+  await addBackgroundToLayer(layer, size, backgroundUrl);
   await addSpritesToLayer(layer, sprites);
 
   stage.draw();

@@ -108,6 +108,7 @@ export function useAiChat() {
           // changed on the canvas mid-turn.
           const presentationState = projectPresentation(
             store.getState().frames,
+            { canvas: store.getState().canvas },
           );
 
           const res = await fetch("/api/chat", {

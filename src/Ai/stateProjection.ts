@@ -158,6 +158,9 @@ export interface ProjectionOptions {
   detail?: "current" | "neighbors" | "all";
   // Safety valve against a runaway frame flooding the context window.
   maxSpritesPerFrame?: number;
+  // The presentation's canvas size. It lives outside FramesState, in
+  // state.canvas, and varies per presentation.
+  canvas?: { width: number; height: number };
 }
 
 const summarizeFrame = (frame: Frame, index: number, total: number): string => {
@@ -169,7 +172,7 @@ export function projectPresentation(
   state: FramesState,
   options: ProjectionOptions = {},
 ): string {
-  const { detail = "neighbors", maxSpritesPerFrame = 80 } = options;
+  const { detail = "neighbors", maxSpritesPerFrame = 80, canvas } = options;
   const frames = state.frames ?? [];
   if (frames.length === 0) return "Presentation is empty (no frames).";
 
@@ -185,6 +188,7 @@ export function projectPresentation(
 
   const lines: string[] = [
     `Title: ${state.title || "(untitled)"}`,
+    ...(canvas ? [`Canvas: ${canvas.width}x${canvas.height}`] : []),
     `${frames.length} frame${frames.length === 1 ? "" : "s"}`,
     "",
   ];
@@ -237,6 +241,7 @@ export function projectPresentation(
 // mixing them would invalidate the prompt cache on every turn.
 export const PROJECTION_FORMAT_GUIDE = `Presentation state is given as text in this format:
 
+Canvas: <width>x<height>
 Frame <n>/<total> id=<frameHandle> "<title>" [(current)] [bg="<name>"]
   <spriteHandle> <kind> "<label>" @<x>,<y> <width>x<height> [rot=<deg>] [opacity=<n>] [anim=<TYPE>] [dur=<s>] [group=<handle>] [extras]
 

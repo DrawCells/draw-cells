@@ -1,4 +1,3 @@
-import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH } from "../constants";
 import { PROJECTION_FORMAT_GUIDE } from "./stateProjection";
 
 // The system prompt is assembled on the server and never accepts client input:
@@ -17,8 +16,8 @@ You build presentations by calling tools. The user cannot see your tool calls, o
 
 # The canvas
 
-- The canvas is ${VIEWPORT_WIDTH} wide and ${VIEWPORT_HEIGHT} tall. The origin is the top-left corner, x increases rightwards, y increases downwards.
-- Coordinates you pass are the CENTRE of a sprite, not its top-left corner. The centre of the canvas is (${Math.round(VIEWPORT_WIDTH / 2)}, ${Math.round(VIEWPORT_HEIGHT / 2)}).
+- The canvas size varies per presentation and is given on the "Canvas:" line of the presentation state. The origin is the top-left corner, x increases rightwards, y increases downwards.
+- Coordinates you pass are the CENTRE of a sprite, not its top-left corner. The centre of the canvas is half its width and half its height.
 - A presentation is a sequence of frames. You are always working on the current frame.
 - Sprites are drawn in order, so a sprite added later appears on top of an earlier one.
 

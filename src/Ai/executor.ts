@@ -1,4 +1,3 @@
-import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH } from "../constants";
 import { loadSpriteImage } from "../helpers";
 import {
   addFrame,
@@ -130,9 +129,10 @@ const searchIndex = new Map<string, CatalogueEntry>();
 // the viewport, so an unclamped coordinate does not error — the sprite just
 // lands somewhere the user cannot see, which reads as the tool silently
 // failing. Clamping is reported back so the model can correct its next call.
-function clampToCanvas(x: number, y: number) {
-  const cx = clamp(Math.round(x), 0, VIEWPORT_WIDTH);
-  const cy = clamp(Math.round(y), 0, VIEWPORT_HEIGHT);
+function clampToCanvas(store: StoreLike, x: number, y: number) {
+  const { width, height } = store.getState().canvas;
+  const cx = clamp(Math.round(x), 0, width);
+  const cy = clamp(Math.round(y), 0, height);
   return {
     x: cx,
     y: cy,
@@ -146,9 +146,10 @@ function clampToCanvas(x: number, y: number) {
 // wrapped line: Konva silently drops lines that overflow a fixed height, so a
 // one-line box cuts a long caption short. 0.62em per character overestimates
 // Arial slightly, which errs towards a spare line rather than a lost one.
-function textBoxSize(text: string, fontSize: number) {
+function textBoxSize(store: StoreLike, text: string, fontSize: number) {
+  const canvasWidth = store.getState().canvas.width;
   const lineWidths = text.split("\n").map((l) => l.length * fontSize * 0.62);
-  const width = clamp(Math.max(...lineWidths), 80, VIEWPORT_WIDTH - 40);
+  const width = clamp(Math.max(...lineWidths), 80, canvasWidth - 40);
   const lines = lineWidths.reduce(
     (n, w) => n + Math.max(1, Math.ceil(w / width)),
     0,
@@ -280,7 +281,7 @@ async function addSprite(
   const width = Math.round(ratio >= 1 ? base * ratio : base);
   const height = Math.round(ratio >= 1 ? base : base / ratio);
 
-  const { x, y, clamped } = clampToCanvas(input.x, input.y);
+  const { x, y, clamped } = clampToCanvas(store, input.x, input.y);
   const id = addSpriteAndGetId(store, {
     backgroundUrl: imageUrl,
     ...(name ? { name } : {}),
@@ -312,9 +313,9 @@ async function addText(
       ? input.font_size
       : DEFAULT_FONT_SIZE;
 
-  const { width, height } = textBoxSize(text, fontSize);
+  const { width, height } = textBoxSize(store, text, fontSize);
 
-  const { x, y, clamped } = clampToCanvas(input.x, input.y);
+  const { x, y, clamped } = clampToCanvas(store, input.x, input.y);
   const id = addSpriteAndGetId(store, {
     kind: "text",
     text,
@@ -457,6 +458,7 @@ const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 // Turns one model-facing edit into a reducer patch. Returns an error string
 // instead when the edit does not fit the sprite (font size on an image, etc.).
 function patchFor(
+  store: StoreLike,
   sprite: Sprite,
   edit: SpriteEdit,
 ): { fields: Record<string, any>; notes: string[] } | string {
@@ -466,6 +468,7 @@ function patchFor(
 
   if (isFiniteNumber(edit.x) || isFiniteNumber(edit.y)) {
     const { x, y, clamped } = clampToCanvas(
+      store,
       isFiniteNumber(edit.x) ? edit.x : sprite.position.x,
       isFiniteNumber(edit.y) ? edit.y : sprite.position.y,
     );
@@ -511,7 +514,11 @@ function patchFor(
     // way add_text sized it, so the text neither wraps nor floats.
     Object.assign(
       fields,
-      textBoxSize(fields.text ?? sprite.text, fields.fontSize ?? sprite.fontSize),
+      textBoxSize(
+        store,
+        fields.text ?? sprite.text,
+        fields.fontSize ?? sprite.fontSize,
+      ),
     );
   }
 
@@ -561,7 +568,7 @@ function updateSpritesTool(
     const resolution = resolveSpriteHandle(state, String(edit.sprite));
     const sprite = resolution.ok ? byKey.get(resolution.id.toString()) : undefined;
     if (!sprite) continue; // unreachable: resolveSprites vetted every handle
-    const patch = patchFor(sprite, edit);
+    const patch = patchFor(store, sprite, edit);
     if (typeof patch === "string") {
       errors.push(patch);
       continue;

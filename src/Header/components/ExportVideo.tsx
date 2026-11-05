@@ -5,13 +5,16 @@ import ExportProgressDialog, {
 } from "./ExportProgressDialog";
 import { useSelector } from "react-redux";
 import State from "../../stateInterface";
-import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH } from "../../constants";
 import { Sprite } from "../../Frames/reducers/frames";
 import { sampleFrames, transitionSeconds } from "../../Animation/sample";
 import Konva from "konva";
 import ArrowDropDown from "@mui/icons-material/ArrowDropDown";
 import { jsPDF } from "jspdf";
-import { addSpritesToLayer, renderFrameToDataUrl } from "../../helpers";
+import {
+  addBackgroundToLayer,
+  addSpritesToLayer,
+  renderFrameToDataUrl,
+} from "../../helpers";
 
 // Frames are rendered, presigned, and uploaded one chunk at a time. This caps
 // how many frame blobs live in memory at once, keeps S3 PUTs within the signed
@@ -35,6 +38,7 @@ interface PresignedItem {
 interface FrameSpec {
   filename: string;
   sprites: Sprite[];
+  backgroundUrl?: string;
 }
 
 // Runs `worker` over `items` with at most `concurrency` in flight at a time,
@@ -116,6 +120,9 @@ export default function ExportVideo({
 
   const frames = useSelector((state: State) => state.frames.frames);
   const currentFrame = useSelector((state: State) => state.frames.currentFrame);
+  const canvasWidth = useSelector((state: State) => state.canvas.width);
+  const canvasHeight = useSelector((state: State) => state.canvas.height);
+  const canvasSize = { width: canvasWidth, height: canvasHeight };
 
   const createStage = () => {
     const container = document.createElement("div");
@@ -125,8 +132,8 @@ export default function ExportVideo({
 
     const stage = new Konva.Stage({
       container: container,
-      width: VIEWPORT_WIDTH,
-      height: VIEWPORT_HEIGHT,
+      width: canvasWidth,
+      height: canvasHeight,
       stroke: "#eaeaea",
       strokeWidth: 1,
       fillPatternRepeat: "no-repeat",
@@ -136,20 +143,16 @@ export default function ExportVideo({
     return stage;
   };
 
-  const renderSprites = async (stage: Konva.Stage, sprites: Sprite[]) => {
+  const renderSprites = async (
+    stage: Konva.Stage,
+    sprites: Sprite[],
+    backgroundUrl?: string,
+  ) => {
     stage.destroyChildren();
     const layer = new Konva.Layer();
     stage.add(layer);
-    const background = new Konva.Rect({
-      x: 0,
-      y: 0,
-      width: VIEWPORT_WIDTH,
-      height: VIEWPORT_HEIGHT,
-      fill: "white",
-    });
-    layer.add(background);
-    background.moveToBottom();
 
+    await addBackgroundToLayer(layer, canvasSize, backgroundUrl);
     await addSpritesToLayer(layer, sprites);
 
     stage.draw();
@@ -182,6 +185,7 @@ export default function ExportVideo({
         frameSpecs.push({
           filename,
           sprites: sampleFrames(earlier, later, i / FPS),
+          backgroundUrl: frames[frameIdx].backgroundUrl,
         });
       }
     }
@@ -196,6 +200,7 @@ export default function ExportVideo({
           i,
         ).padStart(4, "0")}.png`,
         sprites: frames[lastIdx].sprites,
+        backgroundUrl: frames[lastIdx].backgroundUrl,
       });
     }
 
@@ -211,7 +216,9 @@ export default function ExportVideo({
         // Rendering shares one Konva stage, so it must stay sequential.
         const blobs: Blob[] = [];
         for (const spec of chunk) {
-          blobs.push(await renderSprites(stage, spec.sprites));
+          blobs.push(
+            await renderSprites(stage, spec.sprites, spec.backgroundUrl),
+          );
         }
 
         const presigned = await presignBatch(
@@ -292,7 +299,11 @@ export default function ExportVideo({
     setIsExporting(true);
     setAnchorEl(null);
     try {
-      const dataUrl = await renderFrameToDataUrl(currentFrame.sprites);
+      const dataUrl = await renderFrameToDataUrl(
+        currentFrame.sprites,
+        canvasSize,
+        currentFrame.backgroundUrl,
+      );
       const link = document.createElement("a");
       link.href = dataUrl;
       link.download = "frame.png";
@@ -308,14 +319,18 @@ export default function ExportVideo({
     setIsExporting(true);
     setAnchorEl(null);
     try {
-      const dataUrl = await renderFrameToDataUrl(currentFrame.sprites);
+      const dataUrl = await renderFrameToDataUrl(
+        currentFrame.sprites,
+        canvasSize,
+        currentFrame.backgroundUrl,
+      );
       const pdf = new jsPDF({
         orientation:
-          VIEWPORT_WIDTH >= VIEWPORT_HEIGHT ? "landscape" : "portrait",
+          canvasWidth >= canvasHeight ? "landscape" : "portrait",
         unit: "px",
-        format: [VIEWPORT_WIDTH, VIEWPORT_HEIGHT],
+        format: [canvasWidth, canvasHeight],
       });
-      pdf.addImage(dataUrl, "PNG", 0, 0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
+      pdf.addImage(dataUrl, "PNG", 0, 0, canvasWidth, canvasHeight);
       pdf.save("frame.pdf");
     } finally {
       setIsExporting(false);

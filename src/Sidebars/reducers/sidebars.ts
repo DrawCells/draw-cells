@@ -11,6 +11,7 @@ const initialState: SidebarsState = {
   backgrounds: {
     list: [],
     hasEnded: false,
+    nextPageToken: null,
   },
   sprites: {
     list: [],
@@ -32,6 +33,10 @@ export interface SidebarsState {
   backgrounds: {
     list: Array<any>;
     hasEnded: boolean;
+    // S3 continuation token for the next page. Kept in the store (not in the
+    // component) so a remounted sidebar continues where it left off instead of
+    // re-fetching page one.
+    nextPageToken: string | null;
   };
   sprites: {
     list: Array<any>;
@@ -87,7 +92,8 @@ export const sidebars = (
             ...(state.backgrounds?.list || []),
             ...(action.payload.backgrounds || []),
           ],
-          hasEnded: action.payload.hasEnded,
+          hasEnded: !action.payload.nextPageToken,
+          nextPageToken: action.payload.nextPageToken ?? null,
         },
       };
     case Actions.LOAD_SPRITES:

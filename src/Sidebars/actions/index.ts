@@ -45,7 +45,7 @@ export const setAiBusy = (busy: boolean) => ({
 
 export const loadBackgrounds = (payload: {
   backgrounds: Array<any>;
-  hasEnded?: boolean;
+  nextPageToken: string | null;
 }) => ({
   type: Actions.LOAD_BACKGROUNDS,
   payload,

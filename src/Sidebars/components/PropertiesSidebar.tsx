@@ -3,7 +3,11 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { Input, MenuItem, Select, Slider, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
 import React, { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useParams } from 'next/navigation';
+import { setCanvasSize } from '../../Canvas/actions';
+import { CANVAS_MAX_SIZE, CANVAS_MIN_SIZE, CANVAS_SIZE_PRESETS } from '../../constants';
 import { updateSpritesByIds } from '../../Frames/actions';
+import { resizePresentationCanvas } from '../../Header/actions';
 import { isArrowSprite, isTextSprite } from '../../Frames/reducers/frames';
 import State from '../../stateInterface';
 import { toggleProperties } from '../actions';
@@ -62,6 +66,135 @@ function SectionHeader({ title }: { title: string }) {
         <Typography align="center" variant="body2" style={{ fontWeight: 'bold' }}>{title}</Typography>
       </TableCell>
     </TableRow>
+  );
+}
+
+const isValidCanvasSize = (n: number) =>
+  Number.isInteger(n) && n >= CANVAS_MIN_SIZE && n <= CANVAS_MAX_SIZE;
+
+// The presentation's canvas size. A preset applies on pick; typed width/height
+// apply on Enter or blur rather than per keystroke, since each apply is a DB
+// write and intermediate values (typing 1200 passes through 120) would resize
+// the canvas. Sprites keep their coordinates, so shrinking the canvas can leave
+// some outside it.
+function CanvasProperties() {
+  const dispatch = useDispatch();
+  const { id: presentationId } = useParams<{ id: string }>();
+  const width = useSelector((state: State) => state.canvas.width);
+  const height = useSelector((state: State) => state.canvas.height);
+
+  const [draftWidth, setDraftWidth] = useState(String(width));
+  const [draftHeight, setDraftHeight] = useState(String(height));
+  const [saveError, setSaveError] = useState(false);
+
+  // Follow the store when the size changes underneath (presentation load, or a
+  // failed save rolling back).
+  useEffect(() => {
+    setDraftWidth(String(width));
+    setDraftHeight(String(height));
+  }, [width, height]);
+
+  const parsedWidth = Number(draftWidth);
+  const parsedHeight = Number(draftHeight);
+  const widthValid = isValidCanvasSize(parsedWidth);
+  const heightValid = isValidCanvasSize(parsedHeight);
+  const matchingPreset = CANVAS_SIZE_PRESETS.find(
+    (p) => p.width === width && p.height === height,
+  );
+
+  const applySize = async (newWidth: number, newHeight: number) => {
+    if (!isValidCanvasSize(newWidth) || !isValidCanvasSize(newHeight)) return;
+    if (newWidth === width && newHeight === height) return;
+    const previous = { width, height };
+    setSaveError(false);
+    dispatch(setCanvasSize(newWidth, newHeight));
+    const { success } = await resizePresentationCanvas(presentationId, newWidth, newHeight);
+    if (!success) {
+      dispatch(setCanvasSize(previous.width, previous.height));
+      setSaveError(true);
+    }
+  };
+
+  // Commit typed values; an invalid field snaps back to the current size.
+  const commitDraft = () => {
+    if (widthValid && heightValid) {
+      applySize(parsedWidth, parsedHeight);
+    } else {
+      setDraftWidth(String(width));
+      setDraftHeight(String(height));
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+  };
+
+  return (
+    <>
+      <SectionHeader title="Canvas" />
+      <TableRow key="canvasPreset">
+        <TableCell>Preset</TableCell>
+        <TableCell>
+          <Select
+            value={matchingPreset?.label ?? 'custom'}
+            onChange={(e) => {
+              const preset = CANVAS_SIZE_PRESETS.find((p) => p.label === e.target.value);
+              if (preset) applySize(preset.width, preset.height);
+            }}
+            size="small"
+            fullWidth
+          >
+            {CANVAS_SIZE_PRESETS.map((p) => (
+              <MenuItem key={p.label} value={p.label}>
+                {p.label}
+              </MenuItem>
+            ))}
+            <MenuItem value="custom" disabled>Custom</MenuItem>
+          </Select>
+        </TableCell>
+      </TableRow>
+      <TableRow key="canvasWidth">
+        <TableCell>Width</TableCell>
+        <TableCell>
+          <Input
+            type="number"
+            value={draftWidth}
+            error={!widthValid}
+            onChange={(e) => setDraftWidth(e.target.value)}
+            onBlur={commitDraft}
+            onKeyDown={handleKeyDown}
+            inputProps={{ min: CANVAS_MIN_SIZE, max: CANVAS_MAX_SIZE }}
+          />
+        </TableCell>
+      </TableRow>
+      <TableRow key="canvasHeight">
+        <TableCell>Height</TableCell>
+        <TableCell>
+          <Input
+            type="number"
+            value={draftHeight}
+            error={!heightValid}
+            onChange={(e) => setDraftHeight(e.target.value)}
+            onBlur={commitDraft}
+            onKeyDown={handleKeyDown}
+            inputProps={{ min: CANVAS_MIN_SIZE, max: CANVAS_MAX_SIZE }}
+          />
+        </TableCell>
+      </TableRow>
+      <TableRow key="canvasHint">
+        <TableCell colSpan={2}>
+          <Typography
+            variant="caption"
+            color={saveError ? 'error' : 'text.secondary'}
+            component="p"
+          >
+            {saveError
+              ? "Couldn't save the new size. Please try again."
+              : `Whole numbers from ${CANVAS_MIN_SIZE}–${CANVAS_MAX_SIZE}. Content keeps its position.`}
+          </Typography>
+        </TableCell>
+      </TableRow>
+    </>
   );
 }
 
@@ -294,109 +427,115 @@ export default function PropertiesSidebar() {
             </TableRow>
           </TableHead>
           <TableBody>
-            <TableRow>
-              <TableCell colSpan={2}>
-                <Typography align="center" variant="body2" style={{fontWeight: 'bold'}}>Display</Typography>
-              </TableCell>
-            </TableRow>
-            <TableRow key="id">
-              <TableCell>id</TableCell>
-              <TableCell>
-                <Input
-                  value={currentSprite?.id || ''}
-                  onChange={(e) => updateSelected({ id: e.target.value })}
-                />
-              </TableCell>
-            </TableRow>
-            <TableRow key="positionX">
-              <TableCell>Position X</TableCell>
-              <TableCell>
-                <Input
-                  value={currentSprite?.position.x || ''}
-                  onChange={(e) => updateSelected({ positionX: e.target.value })}
-                />
-              </TableCell>
-            </TableRow>
-            <TableRow key="positionY">
-              <TableCell>Position Y</TableCell>
-              <TableCell>
-                <Input
-                  value={currentSprite?.position.y || ''}
-                  onChange={(e) => updateSelected({ positionY: e.target.value })}
-                />
-              </TableCell>
-            </TableRow>
-            <TableRow key="zIndex">
-              <TableCell>z-index</TableCell>
-              <TableCell>
-                <Input
-                  type="number"
-                  value={currentSprite?.zIndex || ''}
-                  onChange={(e) => updateSelected({ zIndex: e.target.value })}
-                />
-              </TableCell>
-            </TableRow>
-            {currentSprite && isTextSprite(currentSprite) && (
-              <TextProperties currentSprite={currentSprite} />
+            {currentSprite ? (
+              <>
+                <TableRow>
+                  <TableCell colSpan={2}>
+                    <Typography align="center" variant="body2" style={{fontWeight: 'bold'}}>Display</Typography>
+                  </TableCell>
+                </TableRow>
+                <TableRow key="id">
+                  <TableCell>id</TableCell>
+                  <TableCell>
+                    <Input
+                      value={currentSprite?.id || ''}
+                      onChange={(e) => updateSelected({ id: e.target.value })}
+                    />
+                  </TableCell>
+                </TableRow>
+                <TableRow key="positionX">
+                  <TableCell>Position X</TableCell>
+                  <TableCell>
+                    <Input
+                      value={currentSprite?.position.x || ''}
+                      onChange={(e) => updateSelected({ positionX: e.target.value })}
+                    />
+                  </TableCell>
+                </TableRow>
+                <TableRow key="positionY">
+                  <TableCell>Position Y</TableCell>
+                  <TableCell>
+                    <Input
+                      value={currentSprite?.position.y || ''}
+                      onChange={(e) => updateSelected({ positionY: e.target.value })}
+                    />
+                  </TableCell>
+                </TableRow>
+                <TableRow key="zIndex">
+                  <TableCell>z-index</TableCell>
+                  <TableCell>
+                    <Input
+                      type="number"
+                      value={currentSprite?.zIndex || ''}
+                      onChange={(e) => updateSelected({ zIndex: e.target.value })}
+                    />
+                  </TableCell>
+                </TableRow>
+                {currentSprite && isTextSprite(currentSprite) && (
+                  <TextProperties currentSprite={currentSprite} />
+                )}
+                {currentSprite && isArrowSprite(currentSprite) && (
+                  <ArrowProperties currentSprite={currentSprite} />
+                )}
+                <TableRow>
+                  <TableCell colSpan={2}>
+                    <Typography align="center" variant="body2" style={{fontWeight: 'bold'}}>Animation</Typography>
+                  </TableCell>
+                </TableRow>
+                <TableRow key="duration">
+                  <TableCell>Duration</TableCell>
+                  <TableCell>
+                    <Input
+                      type="number"
+                      value={currentSprite?.duration || ''}
+                      onChange={(e) => updateSelected({ duration: parseInt(e.target.value) })}
+                    />
+                  </TableCell>
+                </TableRow>
+                <TableRow key="animationType">
+                  <TableCell>Animation Type</TableCell>
+                  <TableCell>
+                    <Select
+                      value={currentSprite?.animationType || ''}
+                      onChange={(e) => updateSelected({ animationType: e.target.value })}
+                      size="small"
+                    >
+                      <MenuItem value="LINEAR">Linear</MenuItem>
+                      <MenuItem value="CHAOTIC">Chaotic</MenuItem>
+                      <MenuItem value="CIRCULAR">Circular</MenuItem>
+                    </Select>
+                  </TableCell>
+                </TableRow>
+                {currentSprite?.animationType === 'CHAOTIC' && (
+                  <ChaoticAnimationProperties currentSprite={currentSprite} />
+                )}
+                {currentSprite?.animationType === 'CIRCULAR' && (<TableRow key="circleDirection">
+                  <TableCell>Circle Direction</TableCell>
+                  <TableCell>
+                    <Select
+                      value={currentSprite?.circleDirection || 1}
+                      onChange={(e) => updateSelected({ circleDirection: e.target.value })}
+                      size="small"
+                    >
+                      <MenuItem value={1}>Upwards</MenuItem>
+                      <MenuItem value={-1}>Downwards</MenuItem>
+                    </Select>
+                  </TableCell>
+                </TableRow>)}
+                {currentSprite?.animationType === 'CIRCULAR' && (<TableRow key="angle">
+                  <TableCell>Angle</TableCell>
+                  <TableCell>
+                    <Input
+                      type="number"
+                      value={currentSprite?.angle || ''}
+                      onChange={(e) => updateSelected({ angle: e.target.value })}
+                    />
+                  </TableCell>
+                </TableRow>)}
+              </>
+            ) : (
+              <CanvasProperties />
             )}
-            {currentSprite && isArrowSprite(currentSprite) && (
-              <ArrowProperties currentSprite={currentSprite} />
-            )}
-            <TableRow>
-              <TableCell colSpan={2}>
-                <Typography align="center" variant="body2" style={{fontWeight: 'bold'}}>Animation</Typography>
-              </TableCell>
-            </TableRow>
-            <TableRow key="duration">
-              <TableCell>Duration</TableCell>
-              <TableCell>
-                <Input
-                  type="number"
-                  value={currentSprite?.duration || ''}
-                  onChange={(e) => updateSelected({ duration: parseInt(e.target.value) })}
-                />
-              </TableCell>
-            </TableRow>
-            <TableRow key="animationType">
-              <TableCell>Animation Type</TableCell>
-              <TableCell>
-                <Select
-                  value={currentSprite?.animationType || ''}
-                  onChange={(e) => updateSelected({ animationType: e.target.value })}
-                  size="small"
-                >
-                  <MenuItem value="LINEAR">Linear</MenuItem>
-                  <MenuItem value="CHAOTIC">Chaotic</MenuItem>
-                  <MenuItem value="CIRCULAR">Circular</MenuItem>
-                </Select>
-              </TableCell>
-            </TableRow>
-            {currentSprite?.animationType === 'CHAOTIC' && (
-              <ChaoticAnimationProperties currentSprite={currentSprite} />
-            )}
-            {currentSprite?.animationType === 'CIRCULAR' && (<TableRow key="circleDirection">
-              <TableCell>Circle Direction</TableCell>
-              <TableCell>
-                <Select
-                  value={currentSprite?.circleDirection || 1}
-                  onChange={(e) => updateSelected({ circleDirection: e.target.value })}
-                  size="small"
-                >
-                  <MenuItem value={1}>Upwards</MenuItem>
-                  <MenuItem value={-1}>Downwards</MenuItem>
-                </Select>
-              </TableCell>
-            </TableRow>)}
-            {currentSprite?.animationType === 'CIRCULAR' && (<TableRow key="angle">
-              <TableCell>Angle</TableCell>
-              <TableCell>
-                <Input
-                  type="number"
-                  value={currentSprite?.angle || ''}
-                  onChange={(e) => updateSelected({ angle: e.target.value })}
-                />
-              </TableCell>
-            </TableRow>)}
           </TableBody>
         </Table>
       </div>
