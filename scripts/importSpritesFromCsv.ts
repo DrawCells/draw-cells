@@ -3,9 +3,9 @@
  * -> upsert into the Supabase `sprites` table.
  *
  * Unlike generateSpriteMap.ts, this touches neither src/constants.tsx nor any
- * category it wasn't explicitly pointed at. `--categories` is required for that
- * reason: a run scoped to the whole bucket would re-upsert every existing sprite
- * with whatever tags happened to be in the CSV, wiping the curated ones.
+ * category it wasn't explicitly pointed at, and only sprites with a CSV row are
+ * written. A sprite already in the table has its tags REPLACED by the CSV's;
+ * sprites with no CSV row are skipped, so a partial CSV is safe to import.
  *
  * S3 is the source of truth for which sprites exist and what colour variants
  * they have; the CSV only supplies tags. Tag ORDER is preserved — search_sprites
@@ -28,11 +28,14 @@ dotenv.config({ path: ".env.local" });
 
 const SPRITES_PREFIX = "sprites/";
 
-// Same colour-suffix convention as generateSpriteMap.ts: "Name - blue.svg".
-const VARIANT_RE = /^(.+?) ?- ([a-z]+(?:_[a-z]+)*)$/;
+// Variant suffix: "Name - blue.svg". Words only, so a name like "Foo - 2D" stays
+// a name, but they may be capitalised or spaced: "Name - South American.svg".
+const VARIANT_RE = /^(.+?) ?- ([A-Za-z]+(?:[ _][A-Za-z]+)*)$/;
 
-// Canonical colour order, so the sidebar's default variant is stable across runs.
+// Canonical variant order, so the sidebar's default (the first variant) is stable
+// across runs. "generic" leads so it is the default wherever it exists.
 const COLOR_ORDER = [
+  "generic",
   "beige",
   "black",
   "blue",
@@ -86,8 +89,7 @@ function parseArgs(argv: string[]) {
   if (typeof categoriesRaw !== "string" || !categoriesRaw.trim()) {
     throw new Error(
       "--categories is required. Pass the S3 folders under sprites/ to import, " +
-        'e.g. --categories "Cells,Viruses". Refusing to scan the whole bucket, ' +
-        "which would overwrite tags on existing sprites.",
+        'e.g. --categories "Cells,Viruses".',
     );
   }
 
@@ -234,7 +236,22 @@ async function listCategory(category: string): Promise<S3Sprite[]> {
     if (match) variantsByName.get(name)!.add(match[2]);
   }
 
-  return [...variantsByName.entries()]
+  // The client rebuilds each path as "<base> - <variant>.svg", or "<base>.svg"
+  // with no variants. Skip anything that wouldn't resolve to a real file, such
+  // as a filename with a leading space, rather than store a broken image.
+  const keySet = new Set(keys);
+  const resolvable = [...variantsByName.entries()].filter(([name, variantSet]) => {
+    const expected = variantSet.size
+      ? [...variantSet].map((v) => `${prefix}${name} - ${v}.svg`)
+      : [`${prefix}${name}.svg`];
+    const missing = expected.filter((key) => !keySet.has(key));
+    for (const key of missing) {
+      console.warn(`⚠️  Skipping "${category}/${name}": no file at "${key}"`);
+    }
+    return missing.length === 0;
+  });
+
+  return resolvable
     .map(([name, variantSet]) => ({
       name,
       category,
@@ -265,7 +282,7 @@ async function main() {
   );
 
   const rows: SpriteRow[] = [];
-  const untagged: string[] = [];
+  const skipped: string[] = [];
   const matchedCsvNames = new Set<string>();
 
   for (const category of categories) {
@@ -290,14 +307,19 @@ async function main() {
         matchedCsvNames.add(sprite.name);
       }
 
-      if (!tags) untagged.push(`${category}/${sprite.name}`);
+      // A partial CSV must not touch the rest of its category: upserting these
+      // with empty tags would wipe the curated tags on existing rows.
+      if (!tags) {
+        skipped.push(`${category}/${sprite.name}`);
+        continue;
+      }
 
       rows.push({
         name: sprite.name,
         category,
         // No .svg extension: the client appends it, plus " - <variant>".
         base_image_url: `${SPRITES_PREFIX}${category}/${sprite.name}`,
-        tags: tags ?? [],
+        tags,
         variants: sprite.variants,
       });
     }
@@ -308,8 +330,8 @@ async function main() {
     );
   }
 
-  for (const name of untagged) {
-    console.warn(`⚠️  No CSV row for S3 sprite: "${name}" — importing with empty tags`);
+  for (const name of skipped) {
+    console.log(`ℹ️  No CSV row for S3 sprite: "${name}" — skipped, left untouched`);
   }
   for (const csvName of tagsByName.keys()) {
     if (!matchedCsvNames.has(csvName)) {
