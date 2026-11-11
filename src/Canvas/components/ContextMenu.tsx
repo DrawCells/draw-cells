@@ -11,6 +11,7 @@ import {
 import { Menu, MenuItem } from "@mui/material";
 import { useDispatch, useSelector } from "react-redux";
 import State from "../../stateInterface";
+import { getFrameLabel } from "../../Frames/reducers/frames";
 
 const initialMenuState: any = {
   mouseX: null,
@@ -79,12 +80,12 @@ export default function ContextMenu({ menuState, setMenuState }: any) {
         </MenuItem>
       </Menu>
       <Menu open={!!anchorEl} anchorEl={anchorEl}>
-        {framesList.map((f) => (
+        {framesList.map((f, index) => (
           <MenuItem
             key={`copy-selected-into-${f.id}`}
             onClick={() => dispatch(copySpritesIntoFrame(selectedIds, f.id || ""))}
           >
-            Frame {f.id}
+            {getFrameLabel(f, index)}
           </MenuItem>
         ))}
       </Menu>

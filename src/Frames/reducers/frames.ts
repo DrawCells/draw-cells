@@ -3,7 +3,7 @@ import { Actions } from "../actions";
 
 const initialFrame = {
   id: generateId(),
-  title: "Frame 1",
+  title: "",
   sprites: [],
 };
 
@@ -458,6 +458,7 @@ const TRACKED_ACTIONS = new Set([
   'SEND_SPRITES_TO_BACK',
   'BRING_SPRITES_TO_FRONT',
   'SET_CURRENT_FRAME_BACKGROUND',
+  'SET_FRAME_TITLE',
   'GROUP_SPRITES_BY_IDS',
   'UNGROUP_SPRITES_BY_IDS',
 ]);
@@ -467,16 +468,18 @@ const snapshot = (state: FramesState): FramesSnapshot => ({
   currentFrame: state.currentFrame,
 });
 
-// Computes the next sequential "Frame N" label. N is one past the highest
-// number already used by an existing "Frame N" title, so labels stay monotonic
-// and never collide even after frames are deleted or reordered (counting frames
-// would reuse a number after a deletion).
-const nextFrameTitle = (frames: Array<Frame>): string => {
-  const highest = frames.reduce((max, f) => {
-    const match = /^Frame (\d+)$/.exec(f.title ?? "");
-    return match ? Math.max(max, parseInt(match[1], 10)) : max;
-  }, 0);
-  return `Frame ${highest + 1}`;
+// A frame's display label: its custom title, or "Frame N" from its position.
+// Frames created before titles were editable stored an automatic "Frame N"
+// title that drifts out of sync with position after reorders and deletions, so
+// that legacy pattern counts as "no custom title" too.
+const LEGACY_AUTO_TITLE = /^Frame \d+$/;
+
+export const getFrameLabel = (
+  frame: Pick<Frame, "title"> | null | undefined,
+  index: number,
+): string => {
+  const title = frame?.title?.trim() ?? "";
+  return title && !LEGACY_AUTO_TITLE.test(title) ? title : `Frame ${index + 1}`;
 };
 
 const restoreSnapshot = (state: FramesState, snap: FramesSnapshot): FramesState => {
@@ -698,13 +701,12 @@ export const frames = (
     }
     case Actions.ADD_FRAME: {
       const { frame: incomingFrame, afterId } = payload;
-      // Assign the new frame's id and title here so both are derived from full
-      // state: the id is globally unique and the title is the next sequential
-      // "Frame N" rather than something computed from array order in the UI.
+      // Assign the new frame's id here so it is globally unique. New frames
+      // start without a custom title; the UI labels them by position.
       const frame = {
         ...incomingFrame,
         id: generateId(),
-        title: nextFrameTitle(state.frames),
+        title: "",
       };
       let baseFrames: Array<Frame>;
       if (afterId != null) {
@@ -953,6 +955,17 @@ export const frames = (
           backgroundUrl: payload,
         },
         frames: newFrames,
+      };
+    }
+    case Actions.SET_FRAME_TITLE: {
+      const { frameId, title } = payload;
+      const matches = (f: Frame) => f.id?.toString() === frameId?.toString();
+      return {
+        ...state,
+        frames: state.frames.map((f) => (matches(f) ? { ...f, title } : f)),
+        currentFrame: matches(state.currentFrame)
+          ? { ...state.currentFrame, title }
+          : state.currentFrame,
       };
     }
     case Actions.REORDER_FRAMES: {

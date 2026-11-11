@@ -6,6 +6,7 @@ import React from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { addFrame, reorderFrames } from "../../Frames/actions";
 import Frame from "../../Frames/components/Frame";
+import { getFrameLabel } from "../../Frames/reducers/frames";
 import State from "../../stateInterface";
 import { toggleFrames } from "../actions";
 import BaseSidebar from "./BaseSidebar";
@@ -28,6 +29,10 @@ export default function FramesSidebar() {
   const currentFrame = useSelector((state: State) => state.frames.currentFrame);
   const [state, setState] = React.useState(initialState);
   const framesList = useSelector((state: State) => state.frames.frames);
+  const currentFrameLabel = getFrameLabel(
+    currentFrame,
+    framesList.findIndex((f) => f.id === currentFrame.id),
+  );
 
   const handleAddFrame = () => {
     // The reducer assigns the frame's id and title from full state.
@@ -75,7 +80,7 @@ export default function FramesSidebar() {
       anchor="bottom"
       additionalTitle={
         <>
-          | <b>Frame {currentFrame.id}</b>
+          | <b>{currentFrameLabel}</b>
         </>
       }
     >

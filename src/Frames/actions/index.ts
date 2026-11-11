@@ -42,6 +42,7 @@ export const Actions = {
   SEND_SPRITES_TO_BACK: "SEND_SPRITES_TO_BACK",
   BRING_SPRITES_TO_FRONT: "BRING_SPRITES_TO_FRONT",
   SET_CURRENT_FRAME_BACKGROUND: "SET_CURRENT_FRAME_BACKGROUND",
+  SET_FRAME_TITLE: "SET_FRAME_TITLE",
   UNDO: "UNDO",
   REDO: "REDO",
   GROUP_SPRITES_BY_IDS: "GROUP_SPRITES_BY_IDS",
@@ -185,6 +186,12 @@ export const recomputeFrames = () => ({
 export const setCurrentFrameBackground = (background: string | undefined) => ({
   type: Actions.SET_CURRENT_FRAME_BACKGROUND,
   payload: background,
+});
+
+// An empty title clears the custom title, so the frame is labelled by position.
+export const setFrameTitle = (frameId: string | number | null, title: string) => ({
+  type: Actions.SET_FRAME_TITLE,
+  payload: { frameId, title: title.trim() },
 });
 
 export const reorderFrames = (fromIndex: number, toIndex: number) => ({

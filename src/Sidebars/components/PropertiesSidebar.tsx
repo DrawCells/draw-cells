@@ -6,9 +6,9 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useParams } from 'next/navigation';
 import { setCanvasSize } from '../../Canvas/actions';
 import { CANVAS_MAX_SIZE, CANVAS_MIN_SIZE, CANVAS_SIZE_PRESETS } from '../../constants';
-import { updateSpritesByIds } from '../../Frames/actions';
+import { setFrameTitle, updateSpritesByIds } from '../../Frames/actions';
 import { resizePresentationCanvas } from '../../Header/actions';
-import { isArrowSprite, isTextSprite } from '../../Frames/reducers/frames';
+import { getFrameLabel, isArrowSprite, isTextSprite } from '../../Frames/reducers/frames';
 import State from '../../stateInterface';
 import { toggleProperties } from '../actions';
 import BaseSidebar from './BaseSidebar';
@@ -66,6 +66,55 @@ function SectionHeader({ title }: { title: string }) {
         <Typography align="center" variant="body2" style={{ fontWeight: 'bold' }}>{title}</Typography>
       </TableCell>
     </TableRow>
+  );
+}
+
+// The current frame's title. Like the canvas size it commits on Enter or blur,
+// so a rename is one undo entry rather than one per keystroke. Clearing the
+// field removes the custom title and the frame falls back to "Frame N".
+function FrameProperties() {
+  const dispatch = useDispatch();
+  const currentFrame = useSelector((state: State) => state.frames.currentFrame);
+  const frames = useSelector((state: State) => state.frames.frames);
+  const index = frames.findIndex((f) => f.id === currentFrame.id);
+  const positionLabel = getFrameLabel(null, index);
+  const savedTitle = getFrameLabel(currentFrame, index) === positionLabel ? '' : currentFrame.title.trim();
+
+  const [draft, setDraft] = useState(savedTitle);
+
+  // Follow the store when switching frames, undoing, or loading.
+  useEffect(() => {
+    setDraft(savedTitle);
+  }, [currentFrame.id, savedTitle]);
+
+  const commit = () => {
+    if (draft.trim() !== savedTitle) {
+      dispatch(setFrameTitle(currentFrame.id, draft));
+    }
+  };
+
+  return (
+    <>
+      <SectionHeader title="Frame" />
+      <TableRow key="frameTitle">
+        <TableCell>Title</TableCell>
+        <TableCell>
+          <Input
+            value={draft}
+            placeholder={positionLabel}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+              if (e.key === 'Escape') {
+                setDraft(savedTitle);
+                (e.target as HTMLInputElement).blur();
+              }
+            }}
+          />
+        </TableCell>
+      </TableRow>
+    </>
   );
 }
 
@@ -534,7 +583,10 @@ export default function PropertiesSidebar() {
                 </TableRow>)}
               </>
             ) : (
-              <CanvasProperties />
+              <>
+                <FrameProperties />
+                <CanvasProperties />
+              </>
             )}
           </TableBody>
         </Table>

@@ -5,6 +5,7 @@ import { useDrag, useDrop } from "react-dnd";
 import { useDispatch, useSelector } from "react-redux";
 import State from "../../stateInterface";
 import { removeFrameById, setCurrentFrame } from "../actions";
+import { getFrameLabel } from "../reducers/frames";
 
 const DRAG_TYPE = "FRAME";
 
@@ -17,7 +18,6 @@ interface FrameProps {
 }
 
 const Frame = ({ title, id, preview, index, onMove }: FrameProps) => {
-  console.log("Preview prop received in Frame component:", preview);
   const dispatch = useDispatch();
   const currentFrame = useSelector((state: State) => state.frames.currentFrame);
   const ref = useRef<HTMLDivElement>(null);
@@ -60,8 +60,7 @@ const Frame = ({ title, id, preview, index, onMove }: FrameProps) => {
       onClick={() => dispatch(setCurrentFrame(id))}
     >
       <Typography variant="body2" color="textSecondary">
-        {" "}
-        {title}{" "}
+        {getFrameLabel({ title }, index)}
       </Typography>
       <div
         style={{
