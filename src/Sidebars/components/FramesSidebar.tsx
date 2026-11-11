@@ -46,6 +46,7 @@ export default function FramesSidebar() {
       id: "",
       title: "",
       sprites: structuredClone(currentFrame.sprites),
+      backgroundUrl: currentFrame.backgroundUrl,
     };
     dispatch(addFrame(newFrame, currentFrame.id));
     handleClose();
